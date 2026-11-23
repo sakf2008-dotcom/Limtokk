@@ -1,0 +1,21 @@
+# dependencies and build output
+node_modules/
+.next/
+out/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+next-env.d.ts
+
+# local demo storage and secrets: never commit
+.ilmtok-demo/
+.env
+.env.*
+!.env.example
+.vercel/
+
+# editor and OS noise
+.DS_Store
+.idea/
+.vscode/
