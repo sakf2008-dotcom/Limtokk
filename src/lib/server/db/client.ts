@@ -1,6 +1,6 @@
 import { PGlite } from "@electric-sql/pglite";
 import postgres from "postgres";
-import { ConfigError, getConfig } from "../config";
+import { ConfigError, databaseSsl, getConfig } from "../config";
 import { MIGRATIONS } from "./schema";
 import { seedDemoData } from "./demo-seed";
 
@@ -99,6 +99,8 @@ function openPostgres(url: string): Sql {
     max: 5,
     // Required for Supabase's transaction pooler (port 6543), which does not support prepared statements.
     prepare: false,
+    // Remote databases are reached over TLS. Local addresses stay plain.
+    ssl: databaseSsl(url),
     idle_timeout: 20,
     connect_timeout: 15,
     onnotice: () => undefined,

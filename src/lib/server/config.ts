@@ -38,13 +38,40 @@ export interface AppConfig {
 
 const ephemeralHolder = globalThis as unknown as { __ilmtokEphemeralSecret?: string };
 
+/**
+ * Removes connection flags that only some drivers understand. The Vercel Supabase integration adds
+ * "pgbouncer=true", which postgres.js would send to the server as an unknown setting.
+ */
+export function normalizeDatabaseUrl(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    url.searchParams.delete("pgbouncer");
+    return url.toString();
+  } catch {
+    // Not a parseable URL: leave it unchanged so that the driver reports the problem.
+    return raw;
+  }
+}
+
+/** Remote databases such as Supabase are reached over TLS. Local addresses stay plain. */
+export function databaseSsl(url: string): false | "require" {
+  try {
+    const host = new URL(url).hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "[::1]" ? false : "require";
+  } catch {
+    return "require";
+  }
+}
+
 export function getConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const explicitMode = env.ILMTOK_DB_MODE?.trim();
   if (explicitMode && explicitMode !== "memory" && explicitMode !== "postgres") {
     throw new ConfigError("ILMTOK_DB_MODE must be either 'memory' or 'postgres'.");
   }
 
-  const databaseUrl = env.DATABASE_URL?.trim() || null;
+  // DATABASE_URL is preferred. POSTGRES_URL is what the Vercel Supabase integration writes automatically.
+  const databaseUrl = normalizeDatabaseUrl(env.DATABASE_URL?.trim() || env.POSTGRES_URL?.trim() || null);
   let dbMode: DbMode;
   if (explicitMode === "memory") {
     dbMode = "memory";
@@ -80,7 +107,8 @@ export function getConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const adminSessionRaw = env.ADMIN_SESSION_SECRET?.trim() ?? "";
   const adminPasswordRaw = env.ADMIN_PASSWORD ?? "";
 
-  const supabaseUrl = env.SUPABASE_URL?.trim().replace(/\/+$/, "") || null;
+  // SUPABASE_URL is preferred. NEXT_PUBLIC_SUPABASE_URL is the name some Supabase integrations use.
+  const supabaseUrl = (env.SUPABASE_URL?.trim() || env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "").replace(/\/+$/, "") || null;
   const supabaseServiceKey = env.SUPABASE_SERVICE_ROLE_KEY?.trim() || null;
   const onVercel = Boolean(env.VERCEL);
 

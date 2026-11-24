@@ -23,5 +23,15 @@ export const GET = handle(async () => {
     adminConfigured: isAdminConfigured(),
     secretIsEphemeral: config.secretIsEphemeral,
     cronConfigured: Boolean(config.cronSecret),
+    // Which settings are present. Only true or false is shown, never a value, so the owner can see what is missing.
+    setup: {
+      databaseUrl: Boolean(config.databaseUrl),
+      supabaseUrl: Boolean(config.supabaseUrl),
+      supabaseServiceKey: Boolean(config.supabaseServiceKey),
+      ilmtokSecret: !config.secretIsEphemeral,
+      adminPassword: Boolean(config.adminPasswordHash || config.adminPassword),
+      adminSessionSecret: Boolean(config.adminSessionSecret),
+      cronSecret: Boolean(config.cronSecret),
+    },
   });
 });

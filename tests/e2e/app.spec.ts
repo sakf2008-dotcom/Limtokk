@@ -235,6 +235,16 @@ test.describe("installable web app", () => {
     const response = await request.get("/api/health");
     const body = await response.json();
     expect(body.demoMode).toBe(true);
+    // Setup checklist: true or false only. The browser server has the admin and secret values, but no database or cron secret.
+    expect(body.setup).toEqual({
+      databaseUrl: false,
+      supabaseUrl: false,
+      supabaseServiceKey: false,
+      ilmtokSecret: true,
+      adminPassword: true,
+      adminSessionSecret: true,
+      cronSecret: false,
+    });
     // Flags such as secretIsEphemeral are allowed; actual secret values must never appear.
     expect(JSON.stringify(body)).not.toContain("e2e-secret-value");
     expect(JSON.stringify(body)).not.toContain("e2e-admin");
