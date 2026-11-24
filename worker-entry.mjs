@@ -3,7 +3,7 @@
 // authenticated route that Vercel Cron uses, so the cleanup logic lives in one place.
 import worker from "./.open-next/worker.js";
 
-export default {
+const entry = {
   fetch(request, env, ctx) {
     return worker.fetch(request, env, ctx);
   },
@@ -19,3 +19,5 @@ export default {
     );
   },
 };
+
+export default entry;
