@@ -19,3 +19,8 @@ next-env.d.ts
 .DS_Store
 .idea/
 .vscode/
+
+# Cloudflare build output and local dev secrets (never committed)
+.open-next/
+.wrangler/
+.dev.vars

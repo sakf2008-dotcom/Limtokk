@@ -44,6 +44,8 @@
   "exclude": [
     "node_modules",
     ".next",
+    ".open-next",
+    ".wrangler",
     "out",
     "coverage",
     ".ilmtok-demo"

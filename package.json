@@ -31,6 +31,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@opennextjs/cloudflare": "^1.20.18",
     "@playwright/test": "1.65.1",
     "@tailwindcss/postcss": "4.3.5",
     "@types/node": "^22.19.0",
@@ -42,6 +43,7 @@
     "tailwindcss": "4.3.5",
     "typescript": "5.9.3",
     "typescript-eslint": "^8.46.0",
-    "vitest": "4.1.12"
+    "vitest": "4.1.12",
+    "wrangler": "^4.167.0"
   }
 }
