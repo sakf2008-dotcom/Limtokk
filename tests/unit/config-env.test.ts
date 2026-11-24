@@ -67,6 +67,29 @@ describe("Supabase settings", () => {
   });
 });
 
+describe("choosing the database URL", () => {
+  it("uses an explicit DATABASE_URL even when the integration also provides one", () => {
+    const config = getConfig(
+      env({ DATABASE_URL: REMOTE, POSTGRES_URL: "postgres://x:y@other.example.test:5432/postgres", ILMTOK_SECRET: SECRET }),
+    );
+    expect(config.databaseUrl).toContain("aws-0-eu-central-1");
+  });
+
+  it("prefers the pooled integration URL over a direct one", () => {
+    const direct = "postgres://postgres.abc:pw@db.abcdefgh.supabase.co:5432/postgres";
+    const config = getConfig(
+      env({ POSTGRES_URL: direct, POSTGRES_PRISMA_URL: `${REMOTE}?pgbouncer=true`, POSTGRES_URL_NON_POOLING: direct, ILMTOK_SECRET: SECRET }),
+    );
+    expect(config.databaseUrl).toContain("pooler.supabase.com");
+  });
+
+  it("falls back to the first integration URL when none is pooled", () => {
+    const direct = "postgres://postgres.abc:pw@db.abcdefgh.supabase.co:5432/postgres";
+    const config = getConfig(env({ POSTGRES_URL_NON_POOLING: direct, ILMTOK_SECRET: SECRET }));
+    expect(config.databaseUrl).toContain("db.abcdefgh.supabase.co");
+  });
+});
+
 describe("database connection settings", () => {
   it("requires TLS for remote hosts and keeps local addresses plain", () => {
     expect(databaseSsl(REMOTE)).toBe("require");

@@ -54,6 +54,29 @@ export function normalizeDatabaseUrl(raw: string | null): string | null {
   }
 }
 
+/** URLs that the Vercel Supabase integration writes. */
+const INTEGRATION_DATABASE_URLS = ["POSTGRES_URL", "POSTGRES_PRISMA_URL", "POSTGRES_URL_NON_POOLING"] as const;
+
+function isPooledUrl(raw: string): boolean {
+  try {
+    const url = new URL(raw);
+    return url.hostname.includes("pooler") || url.port === "6543";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Chooses the database URL. An explicit DATABASE_URL always wins. Otherwise the URLs written by the
+ * Vercel Supabase integration are used, and the pooled one (port 6543) is preferred for serverless use.
+ */
+export function pickDatabaseUrl(env: NodeJS.ProcessEnv): string | null {
+  const explicit = env.DATABASE_URL?.trim();
+  if (explicit) return explicit;
+  const candidates = INTEGRATION_DATABASE_URLS.map((name) => env[name]?.trim()).filter((value): value is string => Boolean(value));
+  return candidates.find(isPooledUrl) ?? candidates[0] ?? null;
+}
+
 /** Remote databases such as Supabase are reached over TLS. Local addresses stay plain. */
 export function databaseSsl(url: string): false | "require" {
   try {
@@ -70,8 +93,8 @@ export function getConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new ConfigError("ILMTOK_DB_MODE must be either 'memory' or 'postgres'.");
   }
 
-  // DATABASE_URL is preferred. POSTGRES_URL is what the Vercel Supabase integration writes automatically.
-  const databaseUrl = normalizeDatabaseUrl(env.DATABASE_URL?.trim() || env.POSTGRES_URL?.trim() || null);
+  // An explicit DATABASE_URL wins. Otherwise the URL written by the Vercel Supabase integration is used.
+  const databaseUrl = normalizeDatabaseUrl(pickDatabaseUrl(env));
   let dbMode: DbMode;
   if (explicitMode === "memory") {
     dbMode = "memory";

@@ -1,4 +1,4 @@
-import { getConfig } from "@/lib/server/config";
+import { getConfig, type AppConfig } from "@/lib/server/config";
 import { getDb } from "@/lib/server/db/client";
 import { handle, json } from "@/lib/server/http";
 import { isAdminConfigured } from "@/lib/server/auth/admin";
@@ -7,7 +7,13 @@ export const dynamic = "force-dynamic";
 
 /** Liveness and configuration summary. Contains no secrets and no identifiers. */
 export const GET = handle(async () => {
-  const config = getConfig();
+  let config: AppConfig;
+  try {
+    config = getConfig();
+  } catch (error) {
+    // A missing or invalid setting. The message names the variable, never its value.
+    return json({ ok: false, configError: error instanceof Error ? error.message : "configuration error" }, { status: 503 });
+  }
   let database: "ok" | "unavailable" = "ok";
   try {
     await (await getDb()).query("SELECT 1");
