@@ -79,6 +79,8 @@ export function UploadFlow() {
   const [durationSec, setDurationSec] = useState<number | null>(null);
   const [limits, setLimits] = useState<PlatformInfoDto | null>(null);
   const [categories, setCategories] = useState<CategoryDto[]>([]);
+  // The category list loads separately. Submitting before it is ready would send no category.
+  const [categoriesState, setCategoriesState] = useState<"loading" | "ready" | "failed">("loading");
   const [error, setError] = useState("");
   const [prefs, setPrefs] = useLocal<Preferences>(LOCAL_KEYS.prefs, DEFAULT_PREFS);
   const [, setOwned] = useLocal<Record<string, OwnedVideo>>(LOCAL_KEYS.owned, {});
@@ -97,9 +99,13 @@ export function UploadFlow() {
     api<{ categories: CategoryDto[] }>("/api/categories")
       .then((payload) => {
         setCategories(payload.categories);
+        setCategoriesState("ready");
         setCategoryId((current) => current || payload.categories[0]?.id || "");
       })
-      .catch(() => setCategories([]));
+      .catch(() => {
+        setCategories([]);
+        setCategoriesState("failed");
+      });
   }, []);
 
   useEffect(() => {
@@ -146,6 +152,7 @@ export function UploadFlow() {
     setError("");
     if (nickname.trim().length < 2) return setError("اكتب اسمًا مستعارًا من حرفين على الأقل.");
     if (title.trim().length < TITLE_MIN) return setError("اكتب عنوانًا واضحًا من 4 أحرف على الأقل.");
+    if (categoriesState !== "ready") return setError("انتظر لحظة حتى تُحمَّل التصنيفات، ثم أعد الإرسال.");
     if (!categoryId) return setError("اختر تصنيفًا للفيديو.");
     if (!guidelines) return setError("يلزم الموافقة على إرشادات المجتمع قبل الإرسال.");
     if (parseCount() > 5) return setError("يمكن إضافة 5 وسوم كحد أقصى.");
@@ -346,7 +353,11 @@ export function UploadFlow() {
 
             <div className="fixed inset-x-0 bottom-0 bg-ink/95 p-4 backdrop-blur-xl" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
               <div className="mx-auto max-w-lg">
-                <Button type="submit" full disabled={storageOff}>
+                {categoriesState === "loading" ? <p className="mb-2 text-center text-xs text-muted">جارٍ تحميل التصنيفات…</p> : null}
+                {categoriesState === "failed" ? (
+                  <p role="alert" className="mb-2 text-center text-xs text-danger">تعذّر تحميل التصنيفات. أعد تحميل الصفحة.</p>
+                ) : null}
+                <Button type="submit" full disabled={storageOff || categoriesState !== "ready"}>
                   <Upload className="size-4" aria-hidden="true" />
                   إرسال للمراجعة
                 </Button>
