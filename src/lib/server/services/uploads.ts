@@ -290,7 +290,7 @@ export async function initUpload(req: Request, body: unknown, now: Date = new Da
     creatorId,
     ownerToken,
     // Demo storage has no signed URLs, so the owner token authorizes the byte upload instead.
-    upload: store.mode === "demo" ? { ...upload, headers: { ...upload.headers, Authorization: `Bearer ${ownerToken}` } } : upload,
+    upload: store.mode === "demo" || store.mode === "r2" ? { ...upload, headers: { ...upload.headers, Authorization: `Bearer ${ownerToken}` } } : upload,
     expiresAt: expiresAt.toISOString(),
     status: "pending_upload",
     maxBytes: settings.maxUploadBytes,
@@ -358,12 +358,19 @@ export async function receiveDemoContent(req: Request, videoId: string): Promise
   }
   if (!record.storage_key) throw new ApiError(409, "not_accepting_upload", "هذا الفيديو لا يقبل ملفًا جديدًا.");
   const store = getBlobStore();
-  if (store.mode !== "demo") throw new ApiError(404, "not_found", "الصفحة غير متاحة.");
+  if (store.mode !== "demo" && store.mode !== "r2") throw new ApiError(404, "not_found", "الصفحة غير متاحة.");
 
   const declared = Number(record.size_bytes ?? 0);
   const contentLength = Number(req.headers.get("content-length") ?? "0");
   if (contentLength > declared) {
     throw new ApiError(413, "file_too_large", "حجم الملف المرفوع يختلف عن الحجم المعلن.");
+  }
+  if (store.mode === "r2") {
+    // Cloudflare: the body streams straight into R2 and is never held whole in memory.
+    // The exact length is enforced by the stream, so a body that does not match is refused.
+    if (!req.body || contentLength <= 0) throw new ApiError(411, "length_required", "يلزم تحديد حجم الملف.");
+    await store.putStream(BUCKET_PENDING, record.storage_key, req.body, contentLength);
+    return;
   }
   const bytes = Buffer.from(await req.arrayBuffer());
   if (bytes.length > declared) {

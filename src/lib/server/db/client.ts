@@ -1,6 +1,7 @@
 import { PGlite } from "@electric-sql/pglite";
 import postgres from "postgres";
 import { ConfigError, databaseSsl, getConfig } from "../config";
+import { currentCloudflareContext } from "../runtime";
 import { MIGRATIONS } from "./schema";
 import { seedDemoData } from "./demo-seed";
 
@@ -133,6 +134,8 @@ export async function migrate(db: Sql): Promise<string[]> {
  * and (in demo mode) seeds demo content. Later calls reuse the same promise.
  */
 export function getDb(): Promise<Sql> {
+  const context = currentCloudflareContext();
+  if (context) return getRequestDb(context);
   const state = dbState();
   if (!state.ready) {
     state.ready = (async () => {
@@ -156,6 +159,30 @@ export function getDb(): Promise<Sql> {
     });
   }
   return state.ready;
+}
+
+// Cloudflare Workers: a socket belongs to the request that opened it, so every request gets its own
+// connection. The schema check runs once per isolate; the advisory lock inside migrate() keeps
+// concurrent isolates safe.
+const requestDbs = new WeakMap<object, Promise<Sql>>();
+let workersSchemaReady = false;
+
+function getRequestDb(context: object): Promise<Sql> {
+  let pending = requestDbs.get(context);
+  if (!pending) {
+    pending = (async () => {
+      const config = getConfig();
+      if (config.dbMode !== "postgres" || !config.databaseUrl) throw new ConfigError("DATABASE_URL is missing.");
+      const db = openPostgres(config.databaseUrl);
+      if (!workersSchemaReady) {
+        await migrate(db);
+        workersSchemaReady = true;
+      }
+      return db;
+    })();
+    requestDbs.set(context, pending);
+  }
+  return pending;
 }
 
 /** Test helper: closes the connection and forgets it, so the next call starts a fresh database. */

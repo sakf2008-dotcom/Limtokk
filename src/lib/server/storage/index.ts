@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { getConfig } from "../config";
 import { ApiError } from "../http";
+import { cloudflareBinding } from "../runtime";
 
 /**
  * Object storage abstraction.
@@ -31,7 +32,7 @@ export interface StoredObjectInfo {
 }
 
 export interface BlobStore {
-  readonly mode: "supabase" | "demo";
+  readonly mode: "supabase" | "demo" | "r2";
   createUploadTarget(args: {
     videoId: string;
     bucket: BucketName;
@@ -47,6 +48,10 @@ export interface BlobStore {
   /** Reads a whole object for demo-mode streaming. Only used by the demo storage implementation. */
   readFile(bucket: BucketName, key: string): Promise<Buffer>;
   writeFile(bucket: BucketName, key: string, data: Buffer): Promise<void>;
+  /** Streams a stored object, or one byte range of it. Null when the object does not exist. */
+  openStream(bucket: BucketName, key: string, range?: { offset: number; length: number }): Promise<ReadableStream<Uint8Array> | null>;
+  /** Stores a body of known length. R2 streams it; demo storage buffers it. */
+  putStream(bucket: BucketName, key: string, body: ReadableStream<Uint8Array>, length: number): Promise<void>;
 }
 
 const UPLOAD_URL_TTL_SECONDS = 15 * 60;
@@ -234,6 +239,14 @@ class SupabaseBlobStore implements BlobStore {
   async writeFile(): Promise<void> {
     throw new Error("writeFile is only available in demo storage.");
   }
+
+  async openStream(): Promise<ReadableStream<Uint8Array> | null> {
+    throw new Error("With Supabase Storage, media is served from Supabase public URLs.");
+  }
+
+  async putStream(): Promise<void> {
+    throw new Error("With Supabase Storage, uploads use signed URLs.");
+  }
 }
 
 /** Local disk storage for development. Not durable on serverless hosts. */
@@ -312,6 +325,127 @@ class DemoBlobStore implements BlobStore {
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.writeFile(target, data);
   }
+
+  async openStream(bucket: BucketName, key: string, range?: { offset: number; length: number }): Promise<ReadableStream<Uint8Array> | null> {
+    const info = await this.stat(bucket, key);
+    if (!info) return null;
+    const bytes = range ? await this.readRange(bucket, key, range.offset, range.length) : await this.readFile(bucket, key);
+    return new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array(bytes));
+        controller.close();
+      },
+    });
+  }
+
+  async putStream(bucket: BucketName, key: string, body: ReadableStream<Uint8Array>): Promise<void> {
+    const reader = body.getReader();
+    const parts: Uint8Array[] = [];
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      parts.push(value);
+    }
+    await this.writeFile(bucket, key, Buffer.concat(parts));
+  }
+}
+
+/** The part of the R2 bucket binding that this code uses. Cloudflare's own types are not needed here. */
+export interface R2ObjectLike {
+  size: number;
+  body: ReadableStream<Uint8Array>;
+  arrayBuffer(): Promise<ArrayBuffer>;
+}
+
+export interface R2BucketLike {
+  head(key: string): Promise<{ size: number } | null>;
+  get(key: string, options?: { range?: { offset: number; length: number } }): Promise<R2ObjectLike | null>;
+  put(key: string, value: ReadableStream<Uint8Array> | Uint8Array): Promise<unknown>;
+  delete(keys: string[]): Promise<void>;
+}
+
+type FixedLengthStreamCtor = new (length: number) => TransformStream<Uint8Array, Uint8Array>;
+
+/** Workers-only stream that enforces an exact length, which R2 needs for streamed writes. */
+function fixedLength(length: number): TransformStream<Uint8Array, Uint8Array> {
+  const Ctor = (globalThis as { FixedLengthStream?: FixedLengthStreamCtor }).FixedLengthStream;
+  if (!Ctor) throw new Error("FixedLengthStream is only available on Cloudflare Workers.");
+  return new Ctor(length);
+}
+
+/**
+ * Cloudflare R2 through the MEDIA binding. Bytes stream through the Worker, so a 50 MB upload is never
+ * held whole in memory. Object names are "<bucket>/<key>" in one R2 bucket.
+ */
+class R2BlobStore implements BlobStore {
+  readonly mode = "r2" as const;
+
+  constructor(private readonly bucket: R2BucketLike) {}
+
+  private objectName(bucket: BucketName, key: string): string {
+    assertSafeKey(key);
+    return `${bucket}/${key}`;
+  }
+
+  async createUploadTarget(args: { videoId: string; bucket: BucketName; key: string; contentType: string }): Promise<UploadTarget> {
+    assertSafeKey(args.key);
+    return {
+      method: "PUT",
+      url: `/api/uploads/${args.videoId}/content`,
+      headers: { "Content-Type": args.contentType },
+      expiresInSeconds: UPLOAD_URL_TTL_SECONDS,
+    };
+  }
+
+  async stat(bucket: BucketName, key: string): Promise<StoredObjectInfo | null> {
+    const head = await this.bucket.head(this.objectName(bucket, key));
+    return head ? { size: head.size } : null;
+  }
+
+  async readRange(bucket: BucketName, key: string, start: number, length: number): Promise<Uint8Array> {
+    const object = await this.bucket.get(this.objectName(bucket, key), { range: { offset: start, length } });
+    return object ? new Uint8Array(await object.arrayBuffer()) : new Uint8Array(0);
+  }
+
+  async openStream(bucket: BucketName, key: string, range?: { offset: number; length: number }): Promise<ReadableStream<Uint8Array> | null> {
+    const object = await this.bucket.get(this.objectName(bucket, key), range ? { range } : undefined);
+    return object ? object.body : null;
+  }
+
+  async putStream(bucket: BucketName, key: string, body: ReadableStream<Uint8Array>, length: number): Promise<void> {
+    await this.bucket.put(this.objectName(bucket, key), body.pipeThrough(fixedLength(length)));
+  }
+
+  async copy(fromBucket: BucketName, fromKey: string, toBucket: BucketName, toKey: string): Promise<void> {
+    const source = await this.bucket.get(this.objectName(fromBucket, fromKey));
+    if (!source) throw new Error("Source object is missing.");
+    await this.bucket.put(this.objectName(toBucket, toKey), source.body.pipeThrough(fixedLength(source.size)));
+  }
+
+  async remove(bucket: BucketName, keys: string[]): Promise<void> {
+    const names = keys
+      .filter((key) => key && /^[A-Za-z0-9/_.-]{1,200}$/.test(key) && !key.includes("..") && !key.startsWith("/"))
+      .map((key) => `${bucket}/${key}`);
+    if (names.length > 0) await this.bucket.delete(names);
+  }
+
+  async signedReadUrl(): Promise<string> {
+    throw new Error("Signed URLs are not used with R2 bindings.");
+  }
+
+  publicUrl(bucket: BucketName, key: string): string | null {
+    return bucket === BUCKET_PUBLIC ? `/api/media/${BUCKET_PUBLIC}/${encodeKey(key)}` : null;
+  }
+
+  async readFile(bucket: BucketName, key: string): Promise<Buffer> {
+    const object = await this.bucket.get(this.objectName(bucket, key));
+    if (!object) throw new Error("Object is missing.");
+    return Buffer.from(await object.arrayBuffer());
+  }
+
+  async writeFile(bucket: BucketName, key: string, data: Buffer): Promise<void> {
+    await this.bucket.put(this.objectName(bucket, key), new Uint8Array(data));
+  }
 }
 
 let cachedStore: BlobStore | null = null;
@@ -330,6 +464,12 @@ export class StorageUnavailableError extends ApiError {
 export function getBlobStore(): BlobStore {
   const config = getConfig();
   if (config.storageMode === "disabled") throw new StorageUnavailableError();
+  if (config.storageMode === "r2") {
+    // Bindings belong to the request, so the adapter is created per request and not cached.
+    const bucket = cloudflareBinding<R2BucketLike>("MEDIA");
+    if (!bucket) throw new StorageUnavailableError();
+    return new R2BlobStore(bucket);
+  }
   if (cachedStore) return cachedStore;
   if (config.storageMode === "supabase" && config.supabaseUrl && config.supabaseServiceKey) {
     cachedStore = new SupabaseBlobStore(config.supabaseUrl, config.supabaseServiceKey);

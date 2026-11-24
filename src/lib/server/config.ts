@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { cloudflareBinding, onCloudflare, runtimeEnv } from "./runtime";
 
 /**
  * Runtime configuration, read from environment variables.
@@ -13,7 +14,7 @@ import { randomBytes } from "node:crypto";
  */
 
 export type DbMode = "memory" | "postgres";
-export type StorageMode = "supabase" | "demo" | "disabled";
+export type StorageMode = "supabase" | "demo" | "disabled" | "r2";
 
 export class ConfigError extends Error {}
 
@@ -81,13 +82,15 @@ export function pickDatabaseUrl(env: NodeJS.ProcessEnv): string | null {
 export function databaseSsl(url: string): false | "require" {
   try {
     const host = new URL(url).hostname;
+    // Hyperdrive connections are proxied inside Cloudflare, and the proxy does not use TLS.
+    if (host.endsWith(".hyperdrive.local")) return false;
     return host === "localhost" || host === "127.0.0.1" || host === "[::1]" ? false : "require";
   } catch {
     return "require";
   }
 }
 
-export function getConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
+export function getConfig(env: NodeJS.ProcessEnv = runtimeEnv()): AppConfig {
   const explicitMode = env.ILMTOK_DB_MODE?.trim();
   if (explicitMode && explicitMode !== "memory" && explicitMode !== "postgres") {
     throw new ConfigError("ILMTOK_DB_MODE must be either 'memory' or 'postgres'.");
@@ -136,7 +139,10 @@ export function getConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const onVercel = Boolean(env.VERCEL);
 
   let storageMode: StorageMode;
-  if (dbMode === "postgres" && supabaseUrl && supabaseServiceKey) {
+  if (dbMode === "postgres" && onCloudflare() && cloudflareBinding("MEDIA")) {
+    // Cloudflare Workers: videos live in the R2 bucket bound as MEDIA.
+    storageMode = "r2";
+  } else if (dbMode === "postgres" && supabaseUrl && supabaseServiceKey) {
     storageMode = "supabase";
   } else if (!onVercel) {
     storageMode = "demo";

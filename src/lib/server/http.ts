@@ -1,5 +1,6 @@
 import { ZodError } from "zod";
 import { hmacHex } from "./crypto";
+import { onCloudflare } from "./runtime";
 
 /** Error with an HTTP status and a stable machine-readable code. Messages are shown to users (Arabic). */
 export class ApiError extends Error {
@@ -96,8 +97,11 @@ export function requireDeviceHash(req: Request): string {
 
 /** Hashed client IP used only for coarse rate limiting. The raw IP is never stored. */
 export function clientIpHash(req: Request): string {
+  // On Cloudflare the edge sets cf-connecting-ip and a client cannot supply it, so it is trusted only there.
+  // Elsewhere a client could fake it, so only the platform's forwarding headers are used.
+  const cloudflareIp = onCloudflare() ? req.headers.get("cf-connecting-ip")?.trim() : null;
   const forwarded = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const ip = forwarded || req.headers.get("x-real-ip")?.trim() || "unknown";
+  const ip = cloudflareIp || forwarded || req.headers.get("x-real-ip")?.trim() || "unknown";
   return hmacHex(ip, "ip");
 }
 
