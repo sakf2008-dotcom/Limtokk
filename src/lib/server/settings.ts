@@ -23,13 +23,13 @@ export interface PlatformSettings {
 }
 
 export const DEFAULT_SETTINGS: PlatformSettings = {
-  maxUploadBytes: 104857600,
+  maxUploadBytes: 52428800,
   maxDurationSeconds: 90,
   minDurationSeconds: 2,
   maxPendingPerDevice: 1,
   maxSubmissionsPerDeviceDay: 3,
   maxUploadsPerDayGlobal: 300,
-  maxStorageBytesTotal: 5368709120,
+  maxStorageBytesTotal: 1073741824,
   pendingExpiryMinutes: 30,
   rejectedRetentionDays: 30,
   reportAutoHideThreshold: 3,

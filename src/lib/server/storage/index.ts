@@ -68,7 +68,6 @@ class SupabaseBlobStore implements BlobStore {
   constructor(
     private readonly baseUrl: string,
     private readonly serviceKey: string,
-    private readonly maxBytes: number,
   ) {}
 
   private apiUrl(suffix: string): string {
@@ -77,6 +76,13 @@ class SupabaseBlobStore implements BlobStore {
 
   private authHeaders(extra: Record<string, string> = {}): Record<string, string> {
     return { Authorization: `Bearer ${this.serviceKey}`, apikey: this.serviceKey, ...extra };
+  }
+
+  /** True when a bucket with this id exists. Used to confirm a "duplicate" answer from Supabase. */
+  private async bucketExists(id: string): Promise<boolean> {
+    const response = await fetch(this.apiUrl(`/bucket/${id}`), { headers: this.authHeaders() });
+    await response.arrayBuffer().catch(() => undefined);
+    return response.ok;
   }
 
   /** Creates the two buckets once per process. Existing buckets are left as they are. */
@@ -94,13 +100,16 @@ class SupabaseBlobStore implements BlobStore {
             id: bucket.id,
             name: bucket.id,
             public: bucket.public,
-            file_size_limit: this.maxBytes,
           }),
         });
-        // 400/409 usually mean "already exists". Anything else is a real configuration problem.
-        if (!response.ok && response.status !== 409 && response.status !== 400) {
-          this.bucketsReady = null;
-          throw new Error(`Supabase bucket setup failed for ${bucket.id}: HTTP ${response.status}`);
+        // Supabase answers 400 or 409 when a bucket already exists. A lookup confirms that, so a real
+        // configuration problem is never hidden behind a "duplicate" answer.
+        if (!response.ok) {
+          const exists = (response.status === 400 || response.status === 409) && (await this.bucketExists(bucket.id));
+          if (!exists) {
+            this.bucketsReady = null;
+            throw new Error(`Supabase bucket setup failed for ${bucket.id}: HTTP ${response.status}`);
+          }
         }
       }
     })();
@@ -323,7 +332,7 @@ export function getBlobStore(): BlobStore {
   if (config.storageMode === "disabled") throw new StorageUnavailableError();
   if (cachedStore) return cachedStore;
   if (config.storageMode === "supabase" && config.supabaseUrl && config.supabaseServiceKey) {
-    cachedStore = new SupabaseBlobStore(config.supabaseUrl, config.supabaseServiceKey, 524_288_000);
+    cachedStore = new SupabaseBlobStore(config.supabaseUrl, config.supabaseServiceKey);
   } else {
     cachedStore = new DemoBlobStore();
   }

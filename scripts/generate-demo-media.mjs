@@ -36,27 +36,22 @@ const fontFace = (weight) =>
   `@font-face{font-family:'Plex';font-weight:${weight};src:url(data:font/woff2;base64,${readFileSync(fontFile(weight)).toString("base64")}) format('woff2');}`;
 
 function slideHtml(video, slide, index, total, accent, categoryName) {
-  const pct = Math.round(((index + 1) / total) * 100);
   return `<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><style>
 ${fontFace(400)}${fontFace(700)}
 html,body{margin:0;width:720px;height:1280px;overflow:hidden;font-family:'Plex',sans-serif;color:#f6f2ea}
 body{background:radial-gradient(120% 60% at 50% 0%,${accent}66 0%,transparent 62%),linear-gradient(180deg,#121621 0%,#07080c 100%);
-  display:flex;flex-direction:column;justify-content:center;padding:120px 72px;box-sizing:border-box;position:relative}
+  display:flex;flex-direction:column;justify-content:center;padding:120px 112px 120px 72px;box-sizing:border-box;position:relative}
 .brand{position:absolute;top:150px;right:72px;font-weight:700;font-size:30px;color:#f5b942}
 .chip{align-self:flex-start;padding:10px 22px;border-radius:999px;background:${accent};color:#07080c;font-weight:700;font-size:26px;margin-bottom:34px}
 .index{font-size:26px;color:#a6acbb;margin-bottom:18px}
 h1{font-size:74px;line-height:1.28;margin:0 0 40px;font-weight:700}
 p{font-size:44px;line-height:1.7;margin:0;color:#e9e4da;font-weight:400}
-.note{position:absolute;bottom:72px;right:72px;font-size:24px;color:#a6acbb}
-.bar{position:absolute;bottom:0;left:0;height:12px;width:${pct}%;background:#f5b942}
 </style></head><body>
 <div class="brand">علم توك</div>
 <div class="chip">${categoryName}</div>
 <div class="index" dir="ltr">${index + 1} / ${total}</div>
 <h1>${slide.title}</h1>
 <p>${slide.body}</p>
-<div class="note">محتوى تجريبي من فريق علم توك</div>
-<div class="bar"></div>
 </body></html>`;
 }
 

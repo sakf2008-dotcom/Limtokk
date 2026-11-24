@@ -72,8 +72,7 @@ export function VideoSlide(props: SlideProps) {
   const [retryKey, setRetryKey] = useState(0);
   const [hearts, setHearts] = useState<Heart[]>([]);
 
-  // Tall (phone-shaped) videos fill the screen. Wide videos keep their shape over a blurred backdrop.
-  const isPortrait = !video.width || !video.height || video.height / video.width >= 1.5;
+  // The whole frame is always visible: the video is letterboxed, and a blurred copy of its poster fills the bands.
   const caption = truncateAtWord(video.description, CAPTION_LIMIT);
 
   // Keep the propagated mute state in sync on the live element.
@@ -212,10 +211,10 @@ export function VideoSlide(props: SlideProps) {
   return (
     <section data-index={index} className="feed-slide" aria-roledescription="شريحة فيديو" aria-label={video.title}>
       <div className="absolute inset-0" style={{ background: `radial-gradient(120% 80% at 50% 0%, ${video.categoryAccent}55, #07080c 70%)` }} aria-hidden="true" />
-      {!isPortrait && video.posterUrl ? (
-        // Wide videos only: a blurred copy of the poster fills the sides. Tall videos cover the screen instead.
+      {near && video.posterUrl ? (
+        // A blurred copy of the poster fills the bands around the video. Only near slides load it.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={video.posterUrl} alt="" aria-hidden="true" className="absolute inset-0 size-full scale-110 object-cover opacity-25 blur-3xl" />
+        <img src={video.posterUrl} alt="" aria-hidden="true" className="absolute inset-0 size-full scale-110 object-cover opacity-30 blur-3xl" />
       ) : null}
 
       <video
@@ -223,7 +222,7 @@ export function VideoSlide(props: SlideProps) {
         key={`${video.id}-${retryKey}`}
         src={src}
         poster={video.posterUrl ?? undefined}
-        className={`absolute inset-0 size-full ${isPortrait ? "object-cover" : "object-contain"}`}
+        className="absolute inset-0 size-full object-contain"
         playsInline
         loop
         preload={active ? "auto" : "metadata"}
@@ -311,7 +310,7 @@ export function VideoSlide(props: SlideProps) {
 
       {/* Caption block. It stays on the left, clear of the action rail. The full text opens in a sheet. */}
       <div
-        className="pointer-events-none absolute bottom-[calc(var(--safe-bottom)+4.25rem)] left-3 right-[4.25rem] z-[4] flex flex-col gap-1.5 text-white"
+        className="pointer-events-none absolute bottom-5 left-3 right-[4.25rem] z-[4] flex flex-col gap-1.5 text-white"
         style={{ textShadow: "0 1px 10px rgba(0,0,0,0.6)" }}
       >
         <div className="flex items-center gap-2">
@@ -367,7 +366,7 @@ export function VideoSlide(props: SlideProps) {
       </div>
 
       {/* Action rail on the physical right edge, as the product design requires. Compact, no heavy backgrounds. */}
-      <div className="absolute right-2 z-[5] flex flex-col items-center gap-3.5" style={{ bottom: "calc(var(--safe-bottom) + 4.5rem)" }}>
+      <div className="absolute right-2 z-[5] flex flex-col items-center gap-3.5" style={{ bottom: "1.25rem" }}>
         <Link href={`/creator/${video.creator.id}`} aria-label={`صفحة ${video.creator.name}`} className="relative mb-1" onPointerDown={stopPropagation} onPointerUp={stopPropagation}>
           <Avatar avatarKey={video.creator.avatar} name={video.creator.name} size={40} ring />
         </Link>
@@ -391,7 +390,7 @@ export function VideoSlide(props: SlideProps) {
         </RailButton>
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 z-[4] h-[2px] bg-white/15" style={{ bottom: "calc(var(--safe-bottom) + 3.5rem)" }} aria-hidden="true">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[4] h-[2px] bg-white/15" aria-hidden="true">
         <div ref={progressRef} className="h-full origin-left bg-brand" style={{ transform: "scaleX(0)" }} />
       </div>
     </section>

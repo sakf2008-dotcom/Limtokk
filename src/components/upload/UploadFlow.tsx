@@ -235,7 +235,7 @@ export function UploadFlow() {
             <section className="rounded-3xl bg-surface p-5 ring-1 ring-white/10">
               <h2 className="text-lg font-semibold">شارك معرفة مفيدة في دقيقة</h2>
               <ul className="mt-3 flex flex-col gap-2 text-sm leading-7 text-muted">
-                <li>• مدة الفيديو حتى {limits?.maxDurationSeconds ?? 90} ثانية، والحجم حتى {limits ? Math.round(limits.uploadMaxBytes / 1048576) : 100} ميجابايت.</li>
+                <li>• مدة الفيديو حتى {limits?.maxDurationSeconds ?? 90} ثانية، والحجم حتى {limits ? Math.round(limits.uploadMaxBytes / 1048576) : 50} ميجابايت.</li>
                 <li>• لا تحتاج إلى حساب أو بريد إلكتروني. يكفي اسم مستعار.</li>
                 <li>• كل فيديو يُراجع بشريًا قبل ظهوره للجميع.</li>
                 <li>• لا تنشر محتوى منسوخًا أو مسيئًا أو مضللًا.</li>

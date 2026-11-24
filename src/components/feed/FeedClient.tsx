@@ -41,8 +41,8 @@ export function FeedClient() {
 
 function FeedSkeleton() {
   return (
-    <div className="relative h-dvh overflow-hidden bg-ink">
-      <div className="absolute inset-x-4 top-[calc(var(--safe-top)+5rem)] bottom-[calc(var(--safe-bottom)+6rem)]">
+    <div className="feed-viewport relative overflow-hidden bg-ink">
+      <div className="absolute inset-x-4 top-[calc(var(--safe-top)+5rem)] bottom-5">
         <Skeleton className="size-full" />
       </div>
       <div className="absolute inset-x-0 top-[calc(var(--safe-top)+1rem)] flex justify-center">
@@ -276,20 +276,20 @@ function FeedInner() {
   const closeSheet = useCallback(() => setSheet(null), []);
 
   return (
-    <div className="relative h-dvh overflow-hidden bg-ink">
+    <div className="feed-viewport relative overflow-hidden bg-ink">
       <h1 className="sr-only">علم توك: فيديوهات تعليمية قصيرة</h1>
 
-      <div ref={scrollRef} className="feed-scroll no-scrollbar h-dvh overflow-y-auto" tabIndex={-1}>
+      <div ref={scrollRef} className="feed-scroll no-scrollbar h-full overflow-y-auto" tabIndex={-1}>
         {phase === "loading" ? <FeedSkeleton /> : null}
 
         {phase === "error" ? (
-          <div className="flex h-dvh items-center justify-center">
+          <div className="flex h-full items-center justify-center">
             <ErrorState message={errorText} onRetry={() => setReloadKey((value) => value + 1)} />
           </div>
         ) : null}
 
         {phase === "ready" && items.length === 0 ? (
-          <div className="flex h-dvh items-center justify-center">
+          <div className="flex h-full items-center justify-center">
             <EmptyState
               icon={<Search className="size-7" aria-hidden="true" />}
               title="لا توجد فيديوهات منشورة بعد"
@@ -321,7 +321,7 @@ function FeedInner() {
       </div>
 
       {phase === "ready" && loadingMore ? (
-        <div className="pointer-events-none absolute inset-x-0 bottom-[calc(var(--safe-bottom)+5.5rem)] z-[3] flex justify-center">
+        <div className="pointer-events-none absolute inset-x-0 top-[calc(var(--safe-top)+4rem)] z-[3] flex justify-center">
           <Spinner label="جارٍ تحميل المزيد" />
         </div>
       ) : null}

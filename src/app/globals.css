@@ -23,6 +23,8 @@
   color-scheme: dark;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* Height of the bottom navigation bar (h-14 in BottomNav). Keep the two in sync. */
+  --nav-height: 3.5rem;
 }
 
 html {
@@ -63,7 +65,13 @@ button {
   display: none;
 }
 
-/* Full-screen vertical feed with one video per viewport. */
+/* The feed fills the screen above the bottom navigation, so no part of a video sits under the menu. */
+.feed-viewport {
+  height: calc(100vh - var(--nav-height) - var(--safe-bottom));
+  height: calc(100dvh - var(--nav-height) - var(--safe-bottom));
+}
+
+/* One video per viewport, snapping slide by slide. */
 .feed-scroll {
   scroll-snap-type: y mandatory;
   overscroll-behavior-y: contain;
@@ -71,8 +79,7 @@ button {
 }
 
 .feed-slide {
-  height: 100vh;
-  height: 100dvh;
+  height: 100%;
   scroll-snap-align: start;
   scroll-snap-stop: always;
   position: relative;

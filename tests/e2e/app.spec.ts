@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { buildMp4 } from "../helpers/mp4";
 
 /** Mobile viewport checks, the video feed mechanics, navigation, and the security gates. */
 
@@ -18,9 +19,24 @@ test.describe("home feed on an iPhone-sized screen", () => {
     expect(labels.map((text) => text.trim()).filter(Boolean)).toEqual(["الرئيسية", "استكشف", "المحفوظات", "المزيد"]);
     await expect(nav.getByRole("link", { name: "إضافة" })).toBeVisible();
 
-    const slideHeight = await page.locator("section[data-index]").first().evaluate((node) => node.getBoundingClientRect().height);
-    const viewport = page.viewportSize();
-    expect(Math.abs(slideHeight - (viewport?.height ?? 0))).toBeLessThanOrEqual(2);
+    // Each slide ends exactly where the bottom menu begins, so no part of a video sits under the menu.
+    const slideBox = await page.locator("section[data-index]").first().boundingBox();
+    const navBox = await nav.boundingBox();
+    expect(slideBox).not.toBeNull();
+    expect(navBox).not.toBeNull();
+    expect(Math.abs(slideBox!.y + slideBox!.height - navBox!.y)).toBeLessThanOrEqual(2);
+  });
+
+  test("keeps the whole video frame visible above the bottom menu", async ({ page }) => {
+    await waitForFeed(page);
+    const video = page.locator("section[data-index]").first().locator("video");
+    const videoBox = await video.boundingBox();
+    const navBox = await page.getByRole("navigation", { name: "التنقل الرئيسي" }).boundingBox();
+    expect(videoBox).not.toBeNull();
+    expect(navBox).not.toBeNull();
+    expect(videoBox!.y + videoBox!.height).toBeLessThanOrEqual(navBox!.y + 1);
+    // Letterboxed, not cropped: the full frame is shown.
+    await expect(video).toHaveCSS("object-fit", "contain");
   });
 
   test("has no horizontal page scroll on a phone width", async ({ page }) => {
@@ -150,6 +166,22 @@ test.describe("upload entry point", () => {
       buffer: Buffer.from("not a video"),
     });
     await expect(page.getByRole("alert").or(page.getByText("صيغة الملف غير مدعومة"))).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("uploads a valid video and tells the uploader it waits for review", async ({ page }) => {
+    await page.goto("/add");
+    await page.locator('input[type="file"]').setInputFiles({
+      name: "experiment.mp4",
+      mimeType: "video/mp4",
+      buffer: buildMp4({ durationMs: 8000, width: 1080, height: 1920, padBytes: 200_000 }),
+    });
+    await expect(page.getByRole("button", { name: "إرسال للمراجعة" })).toBeVisible({ timeout: 10_000 });
+    await page.getByLabel("اسمك المستعار").fill("معلّم تجريبي");
+    await page.getByLabel("عنوان الفيديو").fill("تجربة رفع فيديو تعليمي");
+    await page.getByRole("checkbox").check();
+    await page.getByRole("button", { name: "إرسال للمراجعة" }).click();
+    await expect(page.getByRole("heading", { name: "تم استلام الفيديو" })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("مراجعة بشرية: بانتظار الدور")).toBeVisible();
   });
 
   test("explains the review rule and the limits", async ({ page }) => {

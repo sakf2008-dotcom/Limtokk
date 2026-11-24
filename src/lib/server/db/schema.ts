@@ -325,13 +325,13 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Operational defaults. The admin dashboard can change these at runtime.
 INSERT INTO settings (key, value) VALUES
-  ('max_upload_bytes', '104857600'),
+  ('max_upload_bytes', '52428800'),
   ('max_duration_seconds', '90'),
   ('min_duration_seconds', '2'),
   ('max_pending_per_device', '1'),
   ('max_submissions_per_device_per_day', '3'),
   ('max_uploads_per_day_global', '300'),
-  ('max_storage_bytes_total', '5368709120'),
+  ('max_storage_bytes_total', '1073741824'),
   ('pending_expiry_minutes', '30'),
   ('rejected_retention_days', '30'),
   ('report_auto_hide_threshold', '3'),
