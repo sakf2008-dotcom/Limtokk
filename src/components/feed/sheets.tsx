@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Check, CircleCheck, CircleX, Copy, Flag, MessageCircle, Send, Trash2, UserRound, Volume2, VolumeX } from "lucide-react";
+import { Check, CircleCheck, CircleX, Copy, Flag, Lightbulb, MessageCircle, Send, Sparkles, Trash2, UserRound, Volume2, VolumeX } from "lucide-react";
 import type { CommentDto, QuizDto, VideoCardDto } from "@/lib/domain/types";
 import { Button, Sheet, Spinner, useToast } from "@/components/ui/ui";
 import { api, ClientApiError, messageOf } from "@/lib/client/api";
@@ -511,5 +511,61 @@ function QuizBody({ videoId }: { videoId: string }) {
         </div>
       ) : null}
     </>
+  );
+}
+
+/* ------------------------------------------------------------------ caption (full description) */
+
+/** Full description, hashtags and the key fact. Opened by "المزيد" so the slide itself stays clean. */
+export function CaptionSheet({
+  video,
+  open,
+  onClose,
+  factSaved,
+  onSaveFact,
+  onQuiz,
+}: {
+  video: VideoCardDto | null;
+  open: boolean;
+  onClose: () => void;
+  factSaved: boolean;
+  onSaveFact: (video: VideoCardDto) => void;
+  onQuiz: (video: VideoCardDto) => void;
+}) {
+  return (
+    <Sheet open={open} onClose={onClose} title="الوصف">
+      {open && video ? (
+        <div className="flex flex-col gap-4 text-[15px] leading-7">
+          <h3 className="text-base font-semibold">{video.title}</h3>
+          {video.description ? <p className="whitespace-pre-line text-muted">{video.description}</p> : null}
+          {video.hashtags.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {video.hashtags.map((tag) => (
+                <Link key={tag} href={`/search?tag=${encodeURIComponent(tag)}`} onClick={onClose} className="rounded-full bg-white/[0.06] px-3 py-1 text-sm">
+                  #{tag}
+                </Link>
+              ))}
+            </div>
+          ) : null}
+          {video.keyFact ? (
+            <div className="rounded-2xl bg-white/[0.05] p-4 ring-1 ring-white/10">
+              <p className="flex items-start gap-2 text-sm leading-7">
+                <Lightbulb className="mt-1.5 size-4 shrink-0 text-brand" aria-hidden="true" />
+                <span>{video.keyFact}</span>
+              </p>
+              <Button variant="secondary" className="mt-3 h-9 px-4 text-xs" disabled={factSaved} onClick={() => onSaveFact(video)}>
+                {factSaved ? "محفوظة في مكتبتك" : "احفظ المعلومة"}
+              </Button>
+            </div>
+          ) : null}
+          {video.quizCount > 0 ? (
+            <Button variant="secondary" onClick={() => onQuiz(video)}>
+              <Sparkles className="size-4" aria-hidden="true" />
+              سؤال سريع
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+    </Sheet>
   );
 }

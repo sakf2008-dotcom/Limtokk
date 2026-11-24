@@ -7,7 +7,7 @@ import { Search } from "lucide-react";
 import type { VideoCardDto } from "@/lib/domain/types";
 import { EmptyState, ErrorState, Skeleton, Spinner, useToast } from "@/components/ui/ui";
 import { VideoSlide, type SlideActions } from "./VideoSlide";
-import { CommentsSheet, MoreSheet, QuizSheet, ReportSheet } from "./sheets";
+import { CaptionSheet, CommentsSheet, MoreSheet, QuizSheet, ReportSheet } from "./sheets";
 import { api, messageOf } from "@/lib/client/api";
 import { LOCAL_KEYS, useLocal } from "@/lib/client/local";
 import {
@@ -22,7 +22,7 @@ import {
 } from "@/lib/client/library";
 
 type Tab = "foryou" | "latest";
-type SheetState = { kind: "comments" | "report" | "more" | "quiz"; video: VideoCardDto } | null;
+type SheetState = { kind: "comments" | "report" | "more" | "quiz" | "caption"; video: VideoCardDto } | null;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TABS: Array<{ id: Tab; label: string }> = [
@@ -258,6 +258,7 @@ function FeedInner() {
       onComments: (video) => setSheet({ kind: "comments", video }),
       onReport: (video) => setSheet({ kind: "report", video }),
       onMore: (video) => setSheet({ kind: "more", video }),
+      onCaption: (video) => setSheet({ kind: "caption", video }),
       onQuiz: (video) => setSheet({ kind: "quiz", video }),
       onShare: (video) => void shareVideo(video, toast.show),
       onSave: toggleSave,
@@ -313,7 +314,6 @@ function FeedInner() {
                 muted={prefs.muted}
                 saved={savedIds.has(video.id)}
                 following={followedIds.has(video.creator.id)}
-                factSaved={factIds.has(video.id)}
                 {...actions}
               />
             ))
@@ -327,11 +327,11 @@ function FeedInner() {
       ) : null}
 
       <header className="pointer-events-none absolute inset-x-0 top-0 z-20" style={{ paddingTop: "calc(var(--safe-top) + 0.5rem)" }}>
-        <div className="pointer-events-auto flex items-center justify-between gap-3 bg-gradient-to-b from-black/70 via-black/25 to-transparent px-4 pb-8 pt-1">
-          <Link href="/search" aria-label="بحث" className="grid size-10 place-items-center rounded-full bg-black/30 text-white backdrop-blur-md">
-            <Search className="size-5" aria-hidden="true" />
+        <div className="pointer-events-auto flex items-center justify-between gap-3 bg-gradient-to-b from-black/70 via-black/25 to-transparent px-4 pb-6 pt-1">
+          <Link href="/search" aria-label="بحث" className="grid size-9 place-items-center rounded-full bg-black/30 text-white backdrop-blur-md">
+            <Search className="size-[18px]" aria-hidden="true" />
           </Link>
-          <nav aria-label="نوع التغذية" className="flex items-center gap-5">
+          <nav aria-label="نوع التغذية" className="flex items-center gap-4">
             {TABS.map((item) => {
               const selected = tab === item.id;
               return (
@@ -340,7 +340,7 @@ function FeedInner() {
                   type="button"
                   aria-pressed={selected}
                   onClick={() => setTab(item.id)}
-                  className={`relative py-1 text-[17px] font-semibold transition-colors ${selected ? "text-white" : "text-white/60"}`}
+                  className={`relative py-1 text-[15px] font-semibold transition-colors ${selected ? "text-white" : "text-white/60"}`}
                 >
                   {item.label}
                   {selected ? <span className="absolute inset-x-1 -bottom-1 h-[3px] rounded-full bg-brand" aria-hidden="true" /> : null}
@@ -348,7 +348,7 @@ function FeedInner() {
               );
             })}
           </nav>
-          <span className="size-10" aria-hidden="true" />
+          <span className="size-9" aria-hidden="true" />
         </div>
       </header>
 
@@ -372,6 +372,14 @@ function FeedInner() {
         onReport={() => sheet?.kind === "more" && setSheet({ kind: "report", video: sheet.video })}
       />
       <QuizSheet video={sheet?.kind === "quiz" ? sheet.video : null} open={sheet?.kind === "quiz"} onClose={closeSheet} />
+      <CaptionSheet
+        video={sheet?.kind === "caption" ? sheet.video : null}
+        open={sheet?.kind === "caption"}
+        onClose={closeSheet}
+        factSaved={sheet?.kind === "caption" ? factIds.has(sheet.video.id) : false}
+        onSaveFact={saveFact}
+        onQuiz={(video) => setSheet({ kind: "quiz", video })}
+      />
     </div>
   );
 }

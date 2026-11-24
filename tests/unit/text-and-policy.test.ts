@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSearchText, escapeLike, normalizeArabic, normalizeHashtag, parseHashtags } from "@/lib/domain/text";
+import { buildSearchText, escapeLike, normalizeArabic, normalizeHashtag, parseHashtags, truncateAtWord } from "@/lib/domain/text";
 import { analyzeText } from "@/lib/server/moderation";
 import { parseRange, contentTypeForKey } from "@/lib/server/range";
 import { resolveMime } from "@/lib/server/services/uploads";
@@ -112,3 +112,21 @@ describe("local learning progress (device-only, never a profile)", () => {
     expect(earnedBadges(progress).map((badge) => badge.id)).not.toContain("curious-10");
   });
 });
+
+describe("caption truncation (the slide shows a short caption; the full text opens with المزيد)", () => {
+  const long = "عند الضغط الجوي المعتاد على مستوى سطح البحر، يبدأ الماء في الغليان عند 100 درجة مئوية. وكلما ارتفعنا عن سطح البحر قل الضغط الجوي.";
+
+  it("keeps short text untouched and does not offer more", () => {
+    expect(truncateAtWord("وصف قصير", 60)).toEqual({ text: "وصف قصير", truncated: false });
+  });
+
+  it("cuts long text at a word boundary and marks it as truncated", () => {
+    const result = truncateAtWord(long, 60);
+    expect(result.truncated).toBe(true);
+    expect(result.text.endsWith("…")).toBe(true);
+    expect(Array.from(result.text).length).toBeLessThanOrEqual(61);
+    const visible = result.text.slice(0, -1);
+    expect(long.startsWith(visible)).toBe(true);
+    expect(visible.endsWith(" ")).toBe(false);
+  });
+}); 

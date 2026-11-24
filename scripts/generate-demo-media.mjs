@@ -42,7 +42,7 @@ ${fontFace(400)}${fontFace(700)}
 html,body{margin:0;width:720px;height:1280px;overflow:hidden;font-family:'Plex',sans-serif;color:#f6f2ea}
 body{background:radial-gradient(120% 60% at 50% 0%,${accent}66 0%,transparent 62%),linear-gradient(180deg,#121621 0%,#07080c 100%);
   display:flex;flex-direction:column;justify-content:center;padding:120px 72px;box-sizing:border-box;position:relative}
-.brand{position:absolute;top:70px;right:72px;font-weight:700;font-size:30px;color:#f5b942}
+.brand{position:absolute;top:150px;right:72px;font-weight:700;font-size:30px;color:#f5b942}
 .chip{align-self:flex-start;padding:10px 22px;border-radius:999px;background:${accent};color:#07080c;font-weight:700;font-size:26px;margin-bottom:34px}
 .index{font-size:26px;color:#a6acbb;margin-bottom:18px}
 h1{font-size:74px;line-height:1.28;margin:0 0 40px;font-weight:700}
@@ -69,7 +69,7 @@ const browser = await chromium.launch(existsSync(PREINSTALLED) ? { executablePat
 try {
   for (const video of catalog.videos) {
     const category = CATEGORY[video.categoryId] ?? { name: "معلومات عامة", accent: "#FBBF24" };
-    const page = await browser.newPage({ viewport: { width: 720, height: 1280 }, deviceScaleFactor: 1 });
+    const page = await browser.newPage({ viewport: { width: 720, height: 1280 }, deviceScaleFactor: 1.5 });
     const clips = [];
     for (const [index, slide] of video.slides.entries()) {
       await page.setContent(slideHtml(video, slide, index, video.slides.length, category.accent, category.name), { waitUntil: "load" });
@@ -77,14 +77,14 @@ try {
       const png = join(work, `${video.slug}-${index}.png`);
       await page.screenshot({ path: png, type: "png" });
       if (index === 0) {
-        ffmpeg(["-i", png, "-vf", "scale=360:640", "-q:v", "5", join(outDir, `${video.slug}.jpg`)]);
+        ffmpeg(["-i", png, "-vf", "scale=720:1280", "-q:v", "4", join(outDir, `${video.slug}.jpg`)]);
       }
             const clip = join(work, `${video.slug}-${index}.mp4`);
       ffmpeg([
         "-loop", "1", "-t", String(SLIDE_SECONDS), "-i", png,
         // Static frame with fades: identical frames compress extremely well, which keeps the repository small.
-        "-vf", `scale=540:960,fps=${FPS},fade=t=in:st=0:d=0.35,fade=t=out:st=${(SLIDE_SECONDS - 0.35).toFixed(2)}:d=0.35,format=yuv420p`,
-        "-c:v", "libx264", "-preset", "veryfast", "-tune", "stillimage", "-crf", "36", "-profile:v", "high", "-level", "4.0", "-an", clip,
+        "-vf", `fps=${FPS},fade=t=in:st=0:d=0.35,fade=t=out:st=${(SLIDE_SECONDS - 0.35).toFixed(2)}:d=0.35,format=yuv420p`,
+        "-c:v", "libx264", "-preset", "slow", "-tune", "stillimage", "-crf", "27", "-profile:v", "high", "-level", "4.2", "-pix_fmt", "yuv420p", "-an", clip,
       ]);
       clips.push(clip);
     }

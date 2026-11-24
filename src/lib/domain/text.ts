@@ -64,3 +64,17 @@ export function toAsciiDigits(input: string): string {
     String(d.charCodeAt(0) - 0x06f0),
   );
 }
+
+/**
+ * Cuts text to at most `limit` characters without ending in the middle of a word.
+ * Returns the visible part and whether anything was cut (the UI then shows a "more" button).
+ */
+export function truncateAtWord(input: string, limit: number): { text: string; truncated: boolean } {
+  const clean = input.trim();
+  const chars = Array.from(clean);
+  if (chars.length <= limit) return { text: clean, truncated: false };
+  const head = chars.slice(0, limit).join("");
+  const lastSpace = head.lastIndexOf(" ");
+  const cut = lastSpace > limit * 0.5 ? head.slice(0, lastSpace) : head;
+  return { text: `${cut.replace(/[\s،,.؛:;\-–]+$/u, "")}…`, truncated: true };
+}

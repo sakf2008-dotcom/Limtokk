@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { AlertCircle, Bookmark, Check, Flag, Heart, Lightbulb, MessageCircle, MoreHorizontal, Play, Plus, RotateCcw, Share2, Sparkles, Volume2, VolumeX } from "lucide-react";
+import { AlertCircle, Bookmark, Check, Flag, Heart, MessageCircle, MoreHorizontal, Play, Plus, RotateCcw, Share2, Sparkles, Volume2, VolumeX } from "lucide-react";
 import type { VideoCardDto } from "@/lib/domain/types";
+import { truncateAtWord } from "@/lib/domain/text";
 import { Avatar, Chip } from "@/components/ui/ui";
 import { api } from "@/lib/client/api";
 
@@ -12,6 +13,7 @@ export interface SlideActions {
   onComments: (video: VideoCardDto) => void;
   onReport: (video: VideoCardDto) => void;
   onMore: (video: VideoCardDto) => void;
+  onCaption: (video: VideoCardDto) => void;
   onQuiz: (video: VideoCardDto) => void;
   onShare: (video: VideoCardDto) => void;
   onSave: (video: VideoCardDto) => void;
@@ -29,7 +31,6 @@ interface SlideProps extends SlideActions {
   muted: boolean;
   saved: boolean;
   following: boolean;
-  factSaved: boolean;
 }
 
 interface Heart {
@@ -39,6 +40,10 @@ interface Heart {
 }
 
 const VIEW_THRESHOLD_SECONDS = 3;
+/** How many characters of the description are shown on the slide before the "المزيد" button. */
+const CAPTION_LIMIT = 60;
+
+const stopPropagation = (event: { stopPropagation: () => void }) => event.stopPropagation();
 
 /**
  * One full-screen slide. The <video> element exists only for the active slide and its neighbours,
@@ -48,7 +53,7 @@ const VIEW_THRESHOLD_SECONDS = 3;
  *  - A single tap toggles playback. A double tap likes the video.
  */
 export function VideoSlide(props: SlideProps) {
-  const { video, index, active, near, muted, saved, following, factSaved } = props;
+  const { video, index, active, near, muted, saved, following } = props;
   const videoRef = useRef<HTMLVideoElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const mutedRef = useRef(muted);
@@ -56,7 +61,8 @@ export function VideoSlide(props: SlideProps) {
   const userPausedRef = useRef(false);
   const countedRef = useRef(false);
   const pointerStartRef = useRef<{ x: number; y: number; t: number } | null>(null);
-  const lastTapRef = useRef(0);
+  // Starts at -Infinity: a fresh page has a small performance.now(), so 0 would make an early tap look like a double tap.
+  const lastTapRef = useRef(Number.NEGATIVE_INFINITY);
   const tapTimerRef = useRef<number | null>(null);
   const heartIdRef = useRef(0);
 
@@ -65,6 +71,10 @@ export function VideoSlide(props: SlideProps) {
   const [paused, setPaused] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const [hearts, setHearts] = useState<Heart[]>([]);
+
+  // Tall (phone-shaped) videos fill the screen. Wide videos keep their shape over a blurred backdrop.
+  const isPortrait = !video.width || !video.height || video.height / video.width >= 1.5;
+  const caption = truncateAtWord(video.description, CAPTION_LIMIT);
 
   // Keep the propagated mute state in sync on the live element.
   useEffect(() => {
@@ -129,7 +139,10 @@ export function VideoSlide(props: SlideProps) {
     element.muted = mutedRef.current;
     const attempt = element.play();
     if (attempt && typeof attempt.catch === "function") {
-      attempt.catch(() => {
+      attempt.catch((error: unknown) => {
+        // A pause that interrupts a pending play, or a user pause, is not a failure.
+        if (userPausedRef.current) return;
+        if (error instanceof DOMException && error.name !== "NotAllowedError") return;
         // Autoplay with sound is blocked on this browser. Fall back to muted playback.
         if (!element.muted) {
           element.muted = true;
@@ -182,7 +195,7 @@ export function VideoSlide(props: SlideProps) {
       // Double tap: like (never unlike, to avoid accidental removals) and show the heart.
       if (tapTimerRef.current) window.clearTimeout(tapTimerRef.current);
       tapTimerRef.current = null;
-      lastTapRef.current = 0;
+      lastTapRef.current = Number.NEGATIVE_INFINITY;
       addHeart(x, y);
       if (!video.liked) props.onLike(video);
       return;
@@ -198,20 +211,19 @@ export function VideoSlide(props: SlideProps) {
 
   return (
     <section data-index={index} className="feed-slide" aria-roledescription="شريحة فيديو" aria-label={video.title}>
-      {video.posterUrl ? (
-        // Blurred poster fills the sides when the video is not full-height.
+      <div className="absolute inset-0" style={{ background: `radial-gradient(120% 80% at 50% 0%, ${video.categoryAccent}55, #07080c 70%)` }} aria-hidden="true" />
+      {!isPortrait && video.posterUrl ? (
+        // Wide videos only: a blurred copy of the poster fills the sides. Tall videos cover the screen instead.
         // eslint-disable-next-line @next/next/no-img-element
         <img src={video.posterUrl} alt="" aria-hidden="true" className="absolute inset-0 size-full scale-110 object-cover opacity-25 blur-3xl" />
-      ) : (
-        <div className="absolute inset-0" style={{ background: `radial-gradient(120% 80% at 50% 0%, ${video.categoryAccent}55, #07080c 70%)` }} aria-hidden="true" />
-      )}
+      ) : null}
 
       <video
         ref={videoRef}
         key={`${video.id}-${retryKey}`}
         src={src}
         poster={video.posterUrl ?? undefined}
-        className="absolute inset-0 size-full object-contain"
+        className={`absolute inset-0 size-full ${isPortrait ? "object-cover" : "object-contain"}`}
         playsInline
         loop
         preload={active ? "auto" : "metadata"}
@@ -286,107 +298,100 @@ export function VideoSlide(props: SlideProps) {
         </div>
       ) : null}
 
-      {/* Mute toggle sits under the top tabs (start side in RTL). */}
+      {/* Mute toggle, under the top tabs on the start side. */}
       <button
         type="button"
         onClick={props.onToggleMute}
         aria-label={muted ? "تشغيل الصوت" : "كتم الصوت"}
-        className="absolute left-4 z-[5] grid size-10 place-items-center rounded-full bg-black/35 text-white backdrop-blur-md"
-        style={{ top: "calc(var(--safe-top) + 4.25rem)" }}
+        className="absolute left-3 z-[5] grid size-9 place-items-center rounded-full bg-black/30 text-white backdrop-blur-md"
+        style={{ top: "calc(var(--safe-top) + 3.5rem)" }}
       >
-        {muted ? <VolumeX className="size-5" aria-hidden="true" /> : <Volume2 className="size-5" aria-hidden="true" />}
+        {muted ? <VolumeX className="size-4" aria-hidden="true" /> : <Volume2 className="size-4" aria-hidden="true" />}
       </button>
 
-      {/* Info overlay (text aligned to the start side, kept clear of the action rail on the right). */}
+      {/* Caption block. It stays on the left, clear of the action rail. The full text opens in a sheet. */}
       <div
-        className="pointer-events-none absolute bottom-[calc(var(--safe-bottom)+4.75rem)] left-4 right-[5.25rem] z-[4] flex flex-col gap-2.5 text-white"
-        style={{ textShadow: "0 1px 12px rgba(0,0,0,0.55)" }}
+        className="pointer-events-none absolute bottom-[calc(var(--safe-bottom)+4.25rem)] left-3 right-[4.25rem] z-[4] flex flex-col gap-1.5 text-white"
+        style={{ textShadow: "0 1px 10px rgba(0,0,0,0.6)" }}
       >
-        <div className="flex items-center gap-2.5">
-          <Link href={`/creator/${video.creator.id}`} className="pointer-events-auto flex min-w-0 items-center gap-2" aria-label={`صفحة ${video.creator.name}`}>
-            <span className="truncate text-[15px] font-semibold">@{video.creator.name}</span>
+        <div className="flex items-center gap-2">
+          <Link href={`/creator/${video.creator.id}`} className="pointer-events-auto min-w-0" aria-label={`صفحة ${video.creator.name}`}>
+            <span className="block truncate text-[14px] font-semibold">@{video.creator.name}</span>
           </Link>
           <button
             type="button"
             onClick={() => props.onFollow(video)}
             aria-pressed={following}
-            className={`pointer-events-auto inline-flex h-7 shrink-0 items-center gap-1 rounded-full px-3 text-xs font-semibold ${
+            className={`pointer-events-auto inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2.5 text-[11px] font-semibold ${
               following ? "bg-white/15 text-white ring-1 ring-white/25" : "bg-brand text-ink"
             }`}
           >
-            {following ? <Check className="size-3.5" aria-hidden="true" /> : <Plus className="size-3.5" aria-hidden="true" />}
+            {following ? <Check className="size-3" aria-hidden="true" /> : <Plus className="size-3" aria-hidden="true" />}
             {following ? "تتابع" : "متابعة"}
           </button>
         </div>
 
-        <h2 className="text-balance text-[17px] font-bold leading-7">{video.title}</h2>
-        {video.description ? <p className="line-clamp-2 text-sm leading-6 text-white/90">{video.description}</p> : null}
+        <h2 className="line-clamp-2 text-[15px] font-bold leading-6">{video.title}</h2>
 
-        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-          <span className="inline-flex h-6 items-center rounded-full px-2.5 text-[11px] font-semibold text-ink" style={{ background: video.categoryAccent }}>
+        {video.description ? (
+          <p className="text-[13px] leading-5 text-white/90">
+            {caption.text}
+            {caption.truncated ? (
+              <button type="button" onClick={() => props.onCaption(video)} className="pointer-events-auto ms-1 font-semibold text-white">
+                المزيد
+              </button>
+            ) : null}
+          </p>
+        ) : null}
+
+        <div className="flex flex-wrap items-center gap-1.5 text-[12px]">
+          <span className="inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold text-ink" style={{ background: video.categoryAccent }}>
             {video.categoryName}
           </span>
-          {video.isDemo ? (
-            <span className="inline-flex h-6 items-center rounded-full bg-white/20 px-2.5 text-[11px] font-semibold backdrop-blur">محتوى تجريبي</span>
-          ) : null}
-          {video.hashtags.slice(0, 3).map((tag) => (
-            <Link key={tag} href={`/search?tag=${encodeURIComponent(tag)}`} className="pointer-events-auto text-[13px] font-medium text-white/95" onPointerDown={(event) => event.stopPropagation()} onPointerUp={(event) => event.stopPropagation()}>
+          {video.isDemo ? <span className="inline-flex h-5 items-center rounded-full bg-white/20 px-2 text-[10px] font-semibold backdrop-blur">تجريبي</span> : null}
+          {video.hashtags.slice(0, 2).map((tag) => (
+            <Link key={tag} href={`/search?tag=${encodeURIComponent(tag)}`} className="pointer-events-auto font-medium text-white/95" onPointerDown={stopPropagation} onPointerUp={stopPropagation}>
               #{tag}
             </Link>
           ))}
         </div>
 
-        {video.keyFact ? (
-          <div className="mt-1 flex items-start gap-2 rounded-2xl bg-black/35 p-2.5 text-[13px] leading-6 backdrop-blur-md ring-1 ring-white/10">
-            <Lightbulb className="mt-1 size-4 shrink-0 text-brand" aria-hidden="true" />
-            <p className="min-w-0 flex-1">{video.keyFact}</p>
-            <button
-              type="button"
-              onClick={() => props.onSaveFact(video)}
-              disabled={factSaved}
-              className="pointer-events-auto shrink-0 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold disabled:opacity-60"
-            >
-              {factSaved ? "محفوظة" : "احفظها"}
-            </button>
-          </div>
-        ) : null}
-
         {video.quizCount > 0 ? (
-          <div className="pointer-events-auto w-fit">
+          <div className="pointer-events-auto w-fit pt-0.5">
             <Chip small onClick={() => props.onQuiz(video)} accent="#f5b942">
-              <Sparkles className="size-3.5" aria-hidden="true" />
+              <Sparkles className="size-3" aria-hidden="true" />
               سؤال سريع
             </Chip>
           </div>
         ) : null}
       </div>
 
-      {/* Action rail on the physical right edge, as the product design requires. */}
-      <div className="absolute right-2.5 z-[5] flex flex-col items-center gap-[18px]" style={{ bottom: "calc(var(--safe-bottom) + 5rem)" }}>
-        <Link href={`/creator/${video.creator.id}`} aria-label={`صفحة ${video.creator.name}`} className="relative mb-1" onPointerDown={(event) => event.stopPropagation()} onPointerUp={(event) => event.stopPropagation()}>
-          <Avatar avatarKey={video.creator.avatar} name={video.creator.name} size={46} ring />
+      {/* Action rail on the physical right edge, as the product design requires. Compact, no heavy backgrounds. */}
+      <div className="absolute right-2 z-[5] flex flex-col items-center gap-3.5" style={{ bottom: "calc(var(--safe-bottom) + 4.5rem)" }}>
+        <Link href={`/creator/${video.creator.id}`} aria-label={`صفحة ${video.creator.name}`} className="relative mb-1" onPointerDown={stopPropagation} onPointerUp={stopPropagation}>
+          <Avatar avatarKey={video.creator.avatar} name={video.creator.name} size={40} ring />
         </Link>
         <RailButton label={video.liked ? "إلغاء الإعجاب" : "إعجاب"} count={video.likeCount} onClick={() => props.onLike(video)} pressed={video.liked}>
-          <Heart className={`size-[26px] ${video.liked ? "fill-danger text-danger" : ""}`} aria-hidden="true" />
+          <Heart className={`size-7 ${video.liked ? "fill-danger text-danger" : ""}`} aria-hidden="true" />
         </RailButton>
         <RailButton label="التعليقات" count={video.commentCount} onClick={() => props.onComments(video)}>
-          <MessageCircle className="size-[26px]" aria-hidden="true" />
+          <MessageCircle className="size-7" aria-hidden="true" />
         </RailButton>
         <RailButton label={saved ? "إزالة من المحفوظات" : "حفظ الفيديو"} onClick={() => props.onSave(video)} pressed={saved}>
-          <Bookmark className={`size-[26px] ${saved ? "fill-brand text-brand" : ""}`} aria-hidden="true" />
+          <Bookmark className={`size-7 ${saved ? "fill-brand text-brand" : ""}`} aria-hidden="true" />
         </RailButton>
         <RailButton label="مشاركة" onClick={() => props.onShare(video)}>
-          <Share2 className="size-[25px]" aria-hidden="true" />
+          <Share2 className="size-7" aria-hidden="true" />
         </RailButton>
         <RailButton label="إبلاغ عن هذا الفيديو" onClick={() => props.onReport(video)}>
-          <Flag className="size-[24px]" aria-hidden="true" />
+          <Flag className="size-7" aria-hidden="true" />
         </RailButton>
         <RailButton label="خيارات إضافية" onClick={() => props.onMore(video)}>
-          <MoreHorizontal className="size-[26px]" aria-hidden="true" />
+          <MoreHorizontal className="size-7" aria-hidden="true" />
         </RailButton>
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 z-[4] h-[2px] bg-white/15" style={{ bottom: "calc(var(--safe-bottom) + 4rem)" }} aria-hidden="true">
+      <div className="pointer-events-none absolute inset-x-0 z-[4] h-[2px] bg-white/15" style={{ bottom: "calc(var(--safe-bottom) + 3.5rem)" }} aria-hidden="true">
         <div ref={progressRef} className="h-full origin-left bg-brand" style={{ transform: "scaleX(0)" }} />
       </div>
     </section>
@@ -412,23 +417,23 @@ function RailButton({
       aria-label={label}
       aria-pressed={pressed}
       onClick={onClick}
-      onPointerDown={(event) => event.stopPropagation()}
-      onPointerUp={(event) => event.stopPropagation()}
-      className="flex flex-col items-center gap-1 text-white active:scale-90 transition-transform"
+      onPointerDown={stopPropagation}
+      onPointerUp={stopPropagation}
+      className="flex flex-col items-center gap-0.5 text-white transition-transform active:scale-90"
     >
-      <span className="grid size-11 place-items-center rounded-full bg-black/25 backdrop-blur-md ring-1 ring-white/10">{children}</span>
-      {count !== undefined ? <span className="text-[12px] font-semibold tabular-nums" style={{ textShadow: "0 1px 6px rgba(0,0,0,0.7)" }}>{formatCount(count)}</span> : null}
+      <span className="grid size-9 place-items-center drop-shadow-[0_2px_6px_rgba(0,0,0,0.65)]">{children}</span>
+      {count !== undefined ? (
+        <span className="text-[11px] font-semibold tabular-nums" style={{ textShadow: "0 1px 6px rgba(0,0,0,0.8)" }}>
+          {formatCount(count)}
+        </span>
+      ) : null}
     </button>
   );
 }
 
 function HeartBurst({ x, y }: { x: number; y: number }) {
   return (
-    <span
-      className="heart-pop pointer-events-none absolute z-[6] text-danger"
-      style={{ left: x, top: y }}
-      aria-hidden="true"
-    >
+    <span className="heart-pop pointer-events-none absolute z-[6] text-danger" style={{ left: x, top: y }} aria-hidden="true">
       <Heart className="size-24 fill-danger drop-shadow-[0_4px_18px_rgba(0,0,0,0.5)]" />
     </span>
   );
