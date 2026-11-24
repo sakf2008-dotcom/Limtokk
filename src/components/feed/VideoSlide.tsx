@@ -41,7 +41,7 @@ interface Heart {
 
 const VIEW_THRESHOLD_SECONDS = 3;
 /** How many characters of the description are shown on the slide before the "المزيد" button. */
-const CAPTION_LIMIT = 60;
+const CAPTION_LIMIT = 40;
 
 const stopPropagation = (event: { stopPropagation: () => void }) => event.stopPropagation();
 
