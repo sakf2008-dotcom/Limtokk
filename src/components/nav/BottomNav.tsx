@@ -34,7 +34,7 @@ export function BottomNav() {
                 <Link
                   href={tab.href}
                   aria-label={tab.label}
-                  className="grid h-9 w-12 place-items-center rounded-2xl bg-gradient-to-br from-brand to-teal text-ink shadow-[0_0_0_1px_rgba(255,255,255,0.12)] active:scale-95"
+                  className="grid h-9 w-12 place-items-center rounded-2xl bg-brand text-ink shadow-[0_0_0_1px_rgba(255,255,255,0.12)] active:scale-95"
                 >
                   <Icon className="size-5" strokeWidth={2.6} aria-hidden="true" />
                 </Link>

@@ -61,8 +61,8 @@ export default async function ExplorePage() {
               href={`/category/${category.id}`}
               className="group relative overflow-hidden rounded-2xl bg-surface p-4 ring-1 ring-white/10 transition-transform active:scale-[0.98]"
             >
-              <span className="absolute -start-6 -top-6 size-24 rounded-full opacity-25 blur-2xl transition-opacity group-hover:opacity-40" style={{ background: category.accent }} aria-hidden="true" />
-              <span className="relative grid size-11 place-items-center rounded-2xl text-ink" style={{ background: category.accent }}>
+              <span className="absolute -start-6 -top-6 size-24 rounded-full bg-brand opacity-25 blur-2xl transition-opacity group-hover:opacity-40" aria-hidden="true" />
+              <span className="relative grid size-11 place-items-center rounded-2xl bg-brand text-ink">
                 <CategoryIcon name={category.icon} />
               </span>
               <h3 className="relative mt-3 text-[15px] font-semibold">{category.nameAr}</h3>

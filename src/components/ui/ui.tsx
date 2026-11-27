@@ -55,31 +55,14 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
   );
 }
 
-const GRADIENTS: Array<[string, string]> = [
-  ["#f5b942", "#e0701e"],
-  ["#2bb3a3", "#1d6fa3"],
-  ["#818cf8", "#4338ca"],
-  ["#f472b6", "#be185d"],
-  ["#4ade80", "#15803d"],
-  ["#38bdf8", "#0369a1"],
-  ["#c084fc", "#7e22ce"],
-  ["#fb7185", "#be123c"],
-  ["#a3e635", "#4d7c0f"],
-  ["#fbbf24", "#b45309"],
-  ["#22d3ee", "#0e7490"],
-  ["#e879f9", "#86198f"],
-];
-
-/** Cosmetic avatar from a preset key (a1..a12). Never a real photo or identity. */
-export function Avatar({ avatarKey, name, size = 40, ring = false }: { avatarKey: string; name: string; size?: number; ring?: boolean }) {
-  const index = Math.max(0, (Number.parseInt(avatarKey.replace(/\D/g, ""), 10) || 1) - 1) % GRADIENTS.length;
-  const [from, to] = GRADIENTS[index] ?? GRADIENTS[0]!;
+/** Cosmetic avatar in the app's accent color. The initial is the only variation. Never a real photo. */
+export function Avatar({ name, size = 40, ring = false }: { avatarKey?: string; name: string; size?: number; ring?: boolean }) {
   const initial = Array.from(name.trim())[0] ?? "•";
   return (
     <span
       aria-hidden="true"
       className={`inline-grid shrink-0 place-items-center rounded-full font-semibold text-ink ${ring ? "ring-2 ring-white" : "ring-1 ring-white/15"}`}
-      style={{ width: size, height: size, background: `linear-gradient(135deg, ${from}, ${to})`, fontSize: size * 0.42 }}
+      style={{ width: size, height: size, background: "var(--color-brand)", fontSize: size * 0.42 }}
     >
       {initial}
     </span>
@@ -104,7 +87,7 @@ export function Chip({
   const className = `inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 ${small ? "h-7 text-xs" : "h-9 text-sm"} font-medium transition-colors ${
     active ? "border-brand bg-brand text-ink" : "border-white/12 bg-white/[0.06] text-text hover:bg-white/10"
   }`;
-  const style = accent && !active ? { borderColor: `${accent}66` } : undefined;
+  const style = accent && !active ? { borderColor: `color-mix(in srgb, ${accent} 45%, transparent)` } : undefined;
   if (href) {
     return (
       <Link href={href} className={className} style={style}>
@@ -139,7 +122,7 @@ export function Button({
   full?: boolean;
 }) {
   const styles = {
-    primary: "bg-brand text-ink hover:bg-brand-strong",
+    primary: "bg-brand text-ink hover:opacity-90",
     secondary: "bg-white/10 text-text hover:bg-white/15 ring-1 ring-white/10",
     ghost: "text-muted hover:text-text hover:bg-white/5",
     danger: "bg-danger/90 text-white hover:bg-danger",

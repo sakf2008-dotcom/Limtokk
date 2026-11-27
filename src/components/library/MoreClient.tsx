@@ -8,6 +8,7 @@ import { api, messageOf } from "@/lib/client/api";
 import { LOCAL_KEYS, useLocal } from "@/lib/client/local";
 import { DEFAULT_PREFS, type OwnedVideo, type Preferences } from "@/lib/client/library";
 import { Button, Chip, EmptyState, Sheet, Spinner, useToast } from "@/components/ui/ui";
+import { AccentPicker } from "@/components/library/AccentPicker";
 
 interface OwnerStatus {
   id: string;
@@ -217,12 +218,13 @@ export function MoreClient() {
         </h2>
         <label className="flex items-center justify-between gap-3 rounded-2xl bg-surface p-4 text-sm ring-1 ring-white/10">
           <span>بدء الفيديوهات بدون صوت</span>
-          <input type="checkbox" checked={prefs.muted} onChange={(event) => setPrefs((previous) => ({ ...previous, muted: event.target.checked }))} className="size-5 accent-[#f5b942]" />
+          <input type="checkbox" checked={prefs.muted} onChange={(event) => setPrefs((previous) => ({ ...previous, muted: event.target.checked }))} className="size-5 accent-brand" />
         </label>
         <label className="flex flex-col gap-2 rounded-2xl bg-surface p-4 text-sm ring-1 ring-white/10">
           <span>اسمك المستعار للتعليقات والرفع</span>
           <input value={prefs.nickname} maxLength={24} onChange={(event) => setPrefs((previous) => ({ ...previous, nickname: event.target.value }))} className="h-11 rounded-xl bg-white/[0.06] px-3 outline-none ring-1 ring-white/10 focus:ring-brand" />
         </label>
+        <AccentPicker />
         <Button variant="ghost" className="justify-start text-danger" onClick={clearLocalData}>
           <Trash2 className="size-4" aria-hidden="true" />
           مسح البيانات المحفوظة على هذا الجهاز

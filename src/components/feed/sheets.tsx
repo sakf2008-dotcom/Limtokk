@@ -324,7 +324,7 @@ function ReportForm({ target, onDone }: { target: { type: "video" | "comment"; i
             }`}
           >
             <span>{item.label}</span>
-            <input type="radio" name="report-reason" value={item.value} checked={reason === item.value} onChange={() => setReason(item.value)} className="size-4 accent-[#f5b942]" />
+            <input type="radio" name="report-reason" value={item.value} checked={reason === item.value} onChange={() => setReason(item.value)} className="size-4 accent-brand" />
           </label>
         ))}
       </fieldset>

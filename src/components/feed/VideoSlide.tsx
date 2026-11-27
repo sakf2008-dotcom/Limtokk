@@ -210,7 +210,7 @@ export function VideoSlide(props: SlideProps) {
 
   return (
     <section data-index={index} className="feed-slide" aria-roledescription="شريحة فيديو" aria-label={video.title}>
-      <div className="absolute inset-0" style={{ background: `radial-gradient(120% 80% at 50% 0%, ${video.categoryAccent}55, #07080c 70%)` }} aria-hidden="true" />
+      <div className="absolute inset-0" style={{ background: `radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--color-brand) 35%, transparent), #07080c 70%)` }} aria-hidden="true" />
       {near && video.posterUrl ? (
         // A blurred copy of the poster fills the bands around the video. Only near slides load it.
         // eslint-disable-next-line @next/next/no-img-element
@@ -344,7 +344,7 @@ export function VideoSlide(props: SlideProps) {
         ) : null}
 
         <div className="flex flex-wrap items-center gap-1.5 text-[12px]">
-          <span className="inline-flex h-5 items-center rounded-full px-2 text-[10px] font-semibold text-ink" style={{ background: video.categoryAccent }}>
+          <span className="inline-flex h-5 items-center rounded-full bg-white/15 px-2 text-[10px] font-semibold text-white">
             {video.categoryName}
           </span>
           {video.isDemo ? <span className="inline-flex h-5 items-center rounded-full bg-white/20 px-2 text-[10px] font-semibold backdrop-blur">تجريبي</span> : null}
@@ -357,7 +357,7 @@ export function VideoSlide(props: SlideProps) {
 
         {video.quizCount > 0 ? (
           <div className="pointer-events-auto w-fit pt-0.5">
-            <Chip small onClick={() => props.onQuiz(video)} accent="#f5b942">
+            <Chip small onClick={() => props.onQuiz(video)} accent="var(--color-brand)">
               <Sparkles className="size-3" aria-hidden="true" />
               سؤال سريع
             </Chip>

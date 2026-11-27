@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useSyncExternalStore } from "react";
+import { ACCENT_STORAGE_KEY } from "@/lib/domain/accent";
 
 /**
  * Browser-local state (localStorage). Used only for per-device conveniences: preferences, saved
@@ -21,6 +22,7 @@ export const LOCAL_KEYS = {
   progress: "ilmtok.progress.v1",
   searches: "ilmtok.searches.v1",
   installHint: "ilmtok.installHint.v1",
+  accent: ACCENT_STORAGE_KEY,
 } as const;
 
 const CHANGE_EVENT = "ilmtok:local-change";

@@ -342,7 +342,7 @@ export function UploadFlow() {
             </Field>
 
             <label className="flex items-start gap-3 rounded-2xl bg-white/[0.04] p-4 text-sm leading-7 ring-1 ring-white/10">
-              <input type="checkbox" checked={guidelines} onChange={(event) => setGuidelines(event.target.checked)} className="mt-1 size-5 accent-[#f5b942]" />
+              <input type="checkbox" checked={guidelines} onChange={(event) => setGuidelines(event.target.checked)} className="mt-1 size-5 accent-brand" />
               <span>
                 أؤكد أن الفيديو من إنتاجي أو أملك حق استخدامه، وأوافق على{" "}
                 <Link href="/guidelines" className="font-semibold text-brand underline">إرشادات المجتمع</Link> وأن الفيديو لن يظهر قبل مراجعته.

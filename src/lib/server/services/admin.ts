@@ -172,6 +172,173 @@ export async function deleteQuizByAdmin(id: string, actor: string): Promise<void
   await appendAudit(db, { actor, action: "quiz.delete", targetType: "video", targetId: rows[0]?.video_id ?? null, details: { quizId: id } });
 }
 
+/* ----- Quizzes: the questions of one video, for the moderation console ----- */
+
+export interface AdminQuizDto {
+  id: string;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+function asOptions(value: unknown): string[] {
+  const parsed = typeof value === "string" ? (JSON.parse(value) as unknown) : value;
+  return Array.isArray(parsed) ? parsed.map(String) : [];
+}
+
+export async function listQuizzesByVideo(videoId: string): Promise<AdminQuizDto[]> {
+  if (!isUuid(videoId)) throw new ApiError(422, "invalid_video", "رقم الفيديو غير صالح.");
+  const db = await getDb();
+  const rows = await db.query<{ id: string; question: string; options: unknown; correct_index: number; explanation: string }>(
+    `SELECT id, question, options, correct_index, explanation
+       FROM quizzes
+      WHERE video_id = $1::uuid
+      ORDER BY created_at, id`,
+    [videoId],
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    question: row.question,
+    options: asOptions(row.options),
+    correctIndex: Number(row.correct_index),
+    explanation: row.explanation,
+  }));
+}
+
+/* ----- Learning paths (playlists) ----- */
+
+export interface AdminPlaylistDto {
+  id: string;
+  slug: string;
+  titleAr: string;
+  descriptionAr: string;
+  sortOrder: number;
+  isActive: boolean;
+  items: Array<{ videoId: string; title: string; position: number; status: string }>;
+}
+
+export async function listPlaylistsAdmin(): Promise<AdminPlaylistDto[]> {
+  const db = await getDb();
+  const playlists = await db.query<{
+    id: string;
+    slug: string;
+    title_ar: string;
+    description_ar: string;
+    sort_order: number;
+    is_active: boolean;
+  }>("SELECT id, slug, title_ar, description_ar, sort_order, is_active FROM playlists ORDER BY sort_order, title_ar");
+  // Unpublished videos stay visible here, so the admin can see and remove them. The public page hides them.
+  const items = await db.query<{ playlist_id: string; video_id: string; position: number; title: string; status: string }>(
+    `SELECT pi.playlist_id, pi.video_id, pi.position, v.title, v.status
+       FROM playlist_items pi
+       JOIN videos v ON v.id = pi.video_id
+      ORDER BY pi.position`,
+  );
+  return playlists.map((playlist) => ({
+    id: playlist.id,
+    slug: playlist.slug,
+    titleAr: playlist.title_ar,
+    descriptionAr: playlist.description_ar,
+    sortOrder: Number(playlist.sort_order),
+    isActive: Boolean(playlist.is_active),
+    items: items
+      .filter((item) => item.playlist_id === playlist.id)
+      .map((item) => ({ videoId: item.video_id, title: item.title, position: Number(item.position), status: item.status })),
+  }));
+}
+
+const playlistFieldsSchema = z.object({
+  titleAr: z.string().trim().min(2).max(80),
+  descriptionAr: z.string().trim().max(300).default(""),
+  sortOrder: z.number().int().min(0).max(1000).default(0),
+  isActive: z.boolean().default(true),
+});
+
+const playlistCreateSchema = playlistFieldsSchema.extend({
+  slug: z.string().trim().regex(/^[a-z0-9-]{3,60}$/, "الرابط المختصر يكون بأحرف إنجليزية صغيرة وأرقام وشرطات فقط."),
+});
+
+const playlistUpdateSchema = playlistFieldsSchema.extend({
+  id: z.string().refine(isUuid, "رقم المسار غير صالح"),
+});
+
+const playlistItemSchema = z.object({
+  playlistId: z.string().refine(isUuid, "رقم المسار غير صالح"),
+  videoId: z.string().refine(isUuid, "رقم الفيديو غير صالح"),
+});
+
+export async function createPlaylistByAdmin(body: unknown, actor: string): Promise<string> {
+  const input = playlistCreateSchema.parse(body);
+  const db = await getDb();
+  const rows = await db.query<{ id: string }>(
+    `INSERT INTO playlists (slug, title_ar, description_ar, sort_order, is_active)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (slug) DO NOTHING
+     RETURNING id`,
+    [input.slug, input.titleAr, input.descriptionAr, input.sortOrder, input.isActive],
+  );
+  const id = rows[0]?.id;
+  if (!id) throw new ApiError(409, "slug_taken", "هذا الرابط المختصر مستخدم لمسار آخر.");
+  await appendAudit(db, { actor, action: "playlist.create", targetType: "playlist", targetId: id, details: { slug: input.slug } });
+  return id;
+}
+
+export async function updatePlaylistByAdmin(body: unknown, actor: string): Promise<void> {
+  const input = playlistUpdateSchema.parse(body);
+  const db = await getDb();
+  // The slug is part of the public address, so it does not change after creation.
+  const rows = await db.query<{ id: string }>(
+    `UPDATE playlists
+        SET title_ar = $2, description_ar = $3, sort_order = $4, is_active = $5
+      WHERE id = $1::uuid
+      RETURNING id`,
+    [input.id, input.titleAr, input.descriptionAr, input.sortOrder, input.isActive],
+  );
+  if (rows.length === 0) throw new ApiError(404, "not_found", "المسار غير موجود.");
+  await appendAudit(db, { actor, action: "playlist.update", targetType: "playlist", targetId: input.id, details: { isActive: input.isActive } });
+}
+
+export async function deletePlaylistByAdmin(id: string, actor: string): Promise<void> {
+  if (!isUuid(id)) throw new ApiError(404, "not_found", "المسار غير موجود.");
+  const db = await getDb();
+  const rows = await db.query<{ slug: string }>("DELETE FROM playlists WHERE id = $1::uuid RETURNING slug", [id]);
+  if (rows.length === 0) throw new ApiError(404, "not_found", "المسار غير موجود.");
+  await appendAudit(db, { actor, action: "playlist.delete", targetType: "playlist", targetId: id, details: { slug: rows[0]?.slug ?? "" } });
+}
+
+export async function addPlaylistItemByAdmin(body: unknown, actor: string): Promise<void> {
+  const input = playlistItemSchema.parse(body);
+  const db = await getDb();
+  const playlist = await db.query<{ id: string }>("SELECT id FROM playlists WHERE id = $1::uuid", [input.playlistId]);
+  if (playlist.length === 0) throw new ApiError(404, "not_found", "المسار غير موجود.");
+  const video = await db.query<{ status: string }>("SELECT status FROM videos WHERE id = $1::uuid", [input.videoId]);
+  if (video[0]?.status !== "approved") {
+    throw new ApiError(422, "video_not_published", "لا يمكن إضافة فيديو غير منشور إلى مسار.");
+  }
+  const rows = await db.query<{ video_id: string }>(
+    `INSERT INTO playlist_items (playlist_id, video_id, position)
+     VALUES ($1::uuid, $2::uuid,
+             COALESCE((SELECT max(i.position) + 1 FROM playlist_items i WHERE i.playlist_id = $1::uuid), 0))
+     ON CONFLICT (playlist_id, video_id) DO NOTHING
+     RETURNING video_id`,
+    [input.playlistId, input.videoId],
+  );
+  if (rows.length === 0) throw new ApiError(409, "already_in_playlist", "الفيديو موجود في هذا المسار بالفعل.");
+  await appendAudit(db, { actor, action: "playlist.add_video", targetType: "playlist", targetId: input.playlistId, details: { videoId: input.videoId } });
+}
+
+export async function removePlaylistItemByAdmin(body: unknown, actor: string): Promise<void> {
+  const input = playlistItemSchema.parse(body);
+  const db = await getDb();
+  const rows = await db.query<{ video_id: string }>(
+    "DELETE FROM playlist_items WHERE playlist_id = $1::uuid AND video_id = $2::uuid RETURNING video_id",
+    [input.playlistId, input.videoId],
+  );
+  if (rows.length === 0) throw new ApiError(404, "not_found", "الفيديو غير موجود في هذا المسار.");
+  await appendAudit(db, { actor, action: "playlist.remove_video", targetType: "playlist", targetId: input.playlistId, details: { videoId: input.videoId } });
+}
+
 const blockSchema = z.object({
   deviceHash: z.string().regex(/^[0-9a-f]{64}$/, "معرّف الجهاز غير صالح"),
   hours: z.number().int().min(1).max(24 * 365),

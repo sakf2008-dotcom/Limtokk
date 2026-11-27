@@ -24,11 +24,11 @@ export function VideoTile({ video }: { video: TileVideo }) {
         // eslint-disable-next-line @next/next/no-img-element
         <img src={video.posterUrl} alt="" loading="lazy" decoding="async" className="absolute inset-0 size-full object-cover transition-transform duration-500 group-hover:scale-105" />
       ) : (
-        <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, ${video.categoryAccent}, #0d1017 75%)` }} aria-hidden="true" />
+        <div className="absolute inset-0" style={{ background: `linear-gradient(160deg, color-mix(in srgb, var(--color-brand) 55%, #0d1017), #0d1017 75%)` }} aria-hidden="true" />
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/15 to-black/10" aria-hidden="true" />
       <div className="absolute inset-x-3 bottom-3 flex flex-col gap-1.5">
-        <span className="inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-semibold text-ink" style={{ background: video.categoryAccent }}>
+        <span className="inline-flex w-fit items-center rounded-full bg-white/15 px-2 py-0.5 text-[10px] font-semibold text-white">
           {video.categoryName}
         </span>
         <p className="line-clamp-2 text-[13px] font-semibold leading-5 text-white">{video.title}</p>

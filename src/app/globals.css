@@ -12,9 +12,7 @@
   --color-line: rgb(255 255 255 / 0.09);
   --color-text: #f6f2ea;
   --color-muted: #a6acbb;
-  --color-brand: #f5b942;
-  --color-brand-strong: #e0a020;
-  --color-teal: #2bb3a3;
+  --color-brand: #38bdf8;
   --color-danger: #f26b76;
   --color-success: #4ade80;
 }
@@ -52,7 +50,7 @@ button {
 }
 
 :focus-visible {
-  outline: 2px solid #f5b942;
+  outline: 2px solid var(--color-brand);
   outline-offset: 2px;
   border-radius: 10px;
 }

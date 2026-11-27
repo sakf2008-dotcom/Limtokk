@@ -215,6 +215,92 @@ test.describe("administrator gate", () => {
   });
 });
 
+test.describe("accent color", () => {
+  const brandColor = (page: Page) => page.evaluate(() => document.documentElement.style.getPropertyValue("--color-brand").trim());
+
+  test("one color for the whole app: chosen in المزيد, kept after a reload, and can be reset", async ({ page }) => {
+    await page.goto("/more");
+    const picker = page.getByRole("radiogroup", { name: "لون التطبيق" });
+    await picker.getByRole("radio", { name: "زمردي" }).click();
+    await expect(picker.getByRole("radio", { name: "زمردي" })).toHaveAttribute("aria-checked", "true");
+    await expect.poll(() => brandColor(page)).toBe("#34d399");
+
+    await page.reload();
+    await expect(page.getByRole("radiogroup", { name: "لون التطبيق" }).getByRole("radio", { name: "زمردي" })).toHaveAttribute("aria-checked", "true");
+    await expect.poll(() => brandColor(page)).toBe("#34d399");
+
+    await page.getByRole("button", { name: "اللون الافتراضي" }).click();
+    await expect.poll(() => brandColor(page)).toBe("#38bdf8");
+  });
+
+  test("a saved color is applied on the other screens too", async ({ page }) => {
+    await page.goto("/more");
+    await page.getByRole("radiogroup", { name: "لون التطبيق" }).getByRole("radio", { name: "وردي" }).click();
+    await page.goto("/explore");
+    await expect.poll(() => brandColor(page)).toBe("#f472b6");
+  });
+});
+
+test.describe("admin quizzes and learning paths", () => {
+  test("the admin adds a quiz to a published video and builds a learning path the public can open", async ({ page }) => {
+    const slug = `e2e-path-${Date.now().toString(36)}`;
+    const question = "ما الذي يحدث لسرعة الضوء في الفراغ؟";
+
+    await page.goto("/admin");
+    await page.getByLabel("كلمة المرور").fill("e2e-admin-password-long-enough");
+    await page.getByRole("button", { name: "دخول" }).click();
+    await expect(page.getByRole("button", { name: "نظرة عامة" })).toBeVisible({ timeout: 15_000 });
+
+    await page.getByRole("button", { name: "الاختبارات", exact: true }).click();
+    await page.getByLabel("نص السؤال", { exact: true }).fill(question);
+    await page.getByLabel("الخيار 1", { exact: true }).fill("تتغير بحسب المكان");
+    await page.getByLabel("الخيار 2", { exact: true }).fill("تبقى ثابتة");
+    await page.getByLabel("الخيار 2 هو الإجابة الصحيحة", { exact: true }).check();
+    await page.getByLabel("شرح الإجابة", { exact: true }).fill("سرعة الضوء في الفراغ ثابتة ولا تتغير.");
+    await page.getByRole("button", { name: "إضافة السؤال", exact: true }).click();
+    await expect(page.getByText("تمت إضافة السؤال.")).toBeVisible();
+    await expect(page.getByText(question)).toBeVisible();
+
+    await page.getByRole("button", { name: "المسارات", exact: true }).click();
+    await page.getByLabel("اسم المسار الجديد", { exact: true }).fill("مسار اختبار شامل");
+    await page.getByLabel("الرابط المختصر للمسار الجديد", { exact: true }).fill(slug);
+    await page.getByRole("button", { name: "إنشاء المسار", exact: true }).click();
+    await expect(page.getByText("تم إنشاء المسار.")).toBeVisible();
+
+    const card = page.locator("li").filter({ has: page.getByLabel(`اسم المسار ${slug}`, { exact: true }) });
+    const picker = card.getByLabel(`اختر فيديو لإضافته إلى ${slug}`, { exact: true });
+    const videoTitle = ((await picker.locator("option").nth(1).textContent()) ?? "").trim();
+    expect(videoTitle.length).toBeGreaterThan(0);
+    await picker.selectOption({ index: 1 });
+    await card.getByRole("button", { name: "إضافة", exact: true }).click();
+    await expect(page.getByText("تمت إضافة الفيديو إلى المسار.")).toBeVisible();
+
+    await page.goto(`/playlist/${slug}`);
+    await expect(page.getByRole("heading", { name: "مسار اختبار شامل", level: 1 })).toBeVisible();
+    await expect(page.getByText(videoTitle, { exact: true }).first()).toBeVisible();
+  });
+
+  test("the admin API refuses playlist changes without a session", async ({ request }) => {
+    const response = await request.post("/api/admin/playlists", { data: { slug: "no-session", titleAr: "بدون جلسة" } });
+    expect(response.status()).toBe(401);
+  });
+});
+
+test.describe("search engines and errors", () => {
+  test("robots.txt keeps crawlers out until the site is opened to the public", async ({ request }) => {
+    const response = await request.get("/robots.txt");
+    expect(response.ok()).toBeTruthy();
+    const text = await response.text();
+    expect(text).toContain("Disallow: /");
+  });
+
+  test("the sitemap lists no pages until the site is opened to search engines", async ({ request }) => {
+    const response = await request.get("/sitemap.xml");
+    expect(response.ok()).toBeTruthy();
+    expect(await response.text()).not.toContain("<url>");
+  });
+});
+
 test.describe("installable web app", () => {
   test("serves a manifest with the Arabic name, RTL direction, and icons", async ({ request }) => {
     const response = await request.get("/manifest.webmanifest");
@@ -248,5 +334,16 @@ test.describe("installable web app", () => {
     // Flags such as secretIsEphemeral are allowed; actual secret values must never appear.
     expect(JSON.stringify(body)).not.toContain("e2e-secret-value");
     expect(JSON.stringify(body)).not.toContain("e2e-admin");
+  });
+
+  test("the page declares the iPhone launch screens, and the first one is served", async ({ page, request }) => {
+    await page.goto("/");
+    const links = page.locator('link[rel="apple-touch-startup-image"]');
+    await expect(links).toHaveCount(10);
+    const href = await links.first().getAttribute("href");
+    expect(href).toMatch(/^\/splash\/apple-splash-.+\.png$/);
+    const response = await request.get(href ?? "/");
+    expect(response.ok()).toBeTruthy();
+    expect(response.headers()["content-type"]).toContain("image/png");
   });
 });

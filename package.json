@@ -17,6 +17,7 @@
     "test:e2e": "playwright test",
     "media:demo": "node scripts/generate-demo-media.mjs",
     "icons": "node scripts/generate-icons.mjs",
+    "splash": "node scripts/generate-splash.mjs",
     "admin:hash-password": "node scripts/hash-admin-password.mjs"
   },
   "dependencies": {

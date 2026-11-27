@@ -1,9 +1,15 @@
 import { z } from "zod";
 import { adminHandler } from "@/lib/server/admin-route";
 import { json, readJson } from "@/lib/server/http";
-import { createQuizByAdmin, deleteQuizByAdmin } from "@/lib/server/services/admin";
+import { createQuizByAdmin, deleteQuizByAdmin, listQuizzesByVideo } from "@/lib/server/services/admin";
 
 export const dynamic = "force-dynamic";
+
+/** The questions of one video, for the moderation console. */
+export const GET = adminHandler(async (req) => {
+  const videoId = new URL(req.url).searchParams.get("videoId") ?? "";
+  return json({ items: await listQuizzesByVideo(videoId) });
+});
 
 export const POST = adminHandler(async (req) => {
   const id = await createQuizByAdmin(await readJson(req), "admin");

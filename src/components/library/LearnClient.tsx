@@ -94,7 +94,7 @@ export function LearnClient() {
 
       <section className="grid grid-cols-3 gap-3" aria-label="ملخص التقدم">
         <Stat icon={<Flame className="size-5 text-brand" aria-hidden="true" />} value={streak} label="أيام متتالية" />
-        <Stat icon={<Play className="size-5 text-teal" aria-hidden="true" />} value={progress.watched.length} label="فيديو شاهدته" />
+        <Stat icon={<Play className="size-5 text-brand" aria-hidden="true" />} value={progress.watched.length} label="فيديو شاهدته" />
         <Stat icon={<Check className="size-5 text-success" aria-hidden="true" />} value={`${correctTotal}/${answeredTotal}`} label="إجابات صحيحة" />
       </section>
 

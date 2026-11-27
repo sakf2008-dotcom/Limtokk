@@ -5,8 +5,9 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Ban, Check, CircleCheck, Eye, Flag, LogOut, MessageSquare, RefreshCw, Shield, Star, Trash2, X } from "lucide-react";
 import { api, ClientApiError, messageOf } from "@/lib/client/api";
 import { Button, Sheet, Spinner, useToast } from "@/components/ui/ui";
+import { Playlists, Quizzes } from "./ContentPanels";
 
-type Tab = "overview" | "queue" | "reports" | "comments" | "videos" | "categories" | "settings" | "audit";
+type Tab = "overview" | "queue" | "reports" | "comments" | "videos" | "categories" | "quizzes" | "playlists" | "settings" | "audit";
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "overview", label: "نظرة عامة" },
   { id: "queue", label: "المراجعة" },
@@ -14,6 +15,8 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: "comments", label: "التعليقات" },
   { id: "videos", label: "الفيديوهات" },
   { id: "categories", label: "التصنيفات" },
+  { id: "quizzes", label: "الاختبارات" },
+  { id: "playlists", label: "المسارات" },
   { id: "settings", label: "الإعدادات" },
   { id: "audit", label: "السجل" },
 ];
@@ -157,6 +160,8 @@ export function AdminConsole() {
         {tab === "comments" ? <Comments run={run} /> : null}
         {tab === "videos" ? <VideoList key="all" status="" run={run} title="كل الفيديوهات" /> : null}
         {tab === "categories" ? <Categories run={run} /> : null}
+        {tab === "quizzes" ? <Quizzes run={run} /> : null}
+        {tab === "playlists" ? <Playlists run={run} /> : null}
         {tab === "settings" ? <Settings run={run} /> : null}
         {tab === "audit" ? <Audit /> : null}
       </div>
@@ -567,13 +572,12 @@ function Categories({ run }: { run: Run }) {
   return (
     <ul className="flex flex-col gap-3">
       {items.map((item) => (
-        <li key={item.id} className="grid gap-2 rounded-2xl bg-surface p-4 ring-1 ring-white/10 md:grid-cols-[1fr_1fr_auto_auto_auto]">
+        <li key={item.id} className="grid gap-2 rounded-2xl bg-surface p-4 ring-1 ring-white/10 md:grid-cols-[1fr_1fr_auto_auto]">
           <input value={item.nameAr} onChange={(event) => patch(item.id, { nameAr: event.target.value })} aria-label={`اسم ${item.id}`} className="h-10 rounded-xl bg-white/[0.06] px-3 text-sm outline-none ring-1 ring-white/10" />
           <input value={item.descriptionAr} onChange={(event) => patch(item.id, { descriptionAr: event.target.value })} aria-label={`وصف ${item.id}`} className="h-10 rounded-xl bg-white/[0.06] px-3 text-sm outline-none ring-1 ring-white/10" />
-          <input type="color" value={item.accent} onChange={(event) => patch(item.id, { accent: event.target.value })} aria-label={`لون ${item.id}`} className="h-10 w-14 rounded-xl bg-transparent" />
           <input type="number" value={item.sortOrder} min={0} onChange={(event) => patch(item.id, { sortOrder: Number(event.target.value) })} aria-label={`ترتيب ${item.id}`} className="h-10 w-20 rounded-xl bg-white/[0.06] px-3 text-sm outline-none ring-1 ring-white/10" />
           <div className="flex items-center gap-2">
-            <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={item.isActive} onChange={(event) => patch(item.id, { isActive: event.target.checked })} className="size-4 accent-[#f5b942]" />ظاهر</label>
+            <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={item.isActive} onChange={(event) => patch(item.id, { isActive: event.target.checked })} className="size-4 accent-brand" />ظاهر</label>
             <Button variant="secondary" className="h-10 px-3 text-xs" onClick={() => void save({ ...item, icon: item.icon })}>حفظ</Button>
           </div>
         </li>
@@ -637,7 +641,7 @@ function Settings({ run }: { run: Run }) {
       </div>
       <label className="flex items-center justify-between gap-3 rounded-2xl bg-surface p-4 text-sm ring-1 ring-white/10">
         السماح بالتعليقات
-        <input type="checkbox" checked={Boolean(value("commentsEnabled"))} onChange={(event) => setDraft((previous) => ({ ...previous, commentsEnabled: event.target.checked }))} className="size-5 accent-[#f5b942]" />
+        <input type="checkbox" checked={Boolean(value("commentsEnabled"))} onChange={(event) => setDraft((previous) => ({ ...previous, commentsEnabled: event.target.checked }))} className="size-5 accent-brand" />
       </label>
       <label className="flex flex-col gap-2 rounded-2xl bg-surface p-4 text-sm ring-1 ring-white/10">
         كلمات إضافية محظورة (تُفصل بفاصلة أو سطر، وتُراجَع يدويًا)

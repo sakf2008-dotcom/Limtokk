@@ -39,7 +39,7 @@ export default async function CategoryPage({ params }: Props) {
   return (
     <main className="min-h-dvh px-4 pb-28" style={{ paddingTop: "calc(var(--safe-top) + 1rem)" }}>
       <header className="mb-6 flex items-center gap-4">
-        <span className="grid size-14 shrink-0 place-items-center rounded-2xl text-ink" style={{ background: category.accent }}>
+        <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-brand text-ink">
           <CategoryIcon name={category.icon} className="size-7" />
         </span>
         <div className="min-w-0">
